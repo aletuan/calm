@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import type { TimeWindow } from "../lib/ipc";
 import type { TrafficFilter } from "../lib/nodeFlows";
+import { defaultTopologyView, type TopologyView } from "../lib/topologyView";
 import type { ScreenId } from "./nav";
 
 /**
@@ -23,6 +24,9 @@ interface SelectionCtx {
   setSelection: (s: Selection) => void;
   screen: ScreenId;
   setScreen: (s: ScreenId) => void;
+  /** Topology overlays and zoom, kept while other screens are open. */
+  topologyView: TopologyView;
+  setTopologyView: (f: (v: TopologyView) => TopologyView) => void;
 }
 
 const Ctx = createContext<SelectionCtx | null>(null);
@@ -30,7 +34,8 @@ const Ctx = createContext<SelectionCtx | null>(null);
 export function SelectionProvider({ children }: { children: ReactNode }) {
   const [selection, setSelection] = useState<Selection>({ subjectId: null, timeWindow: null, focusAddress: null, trafficFilter: null });
   const [screen, setScreen] = useState<ScreenId>("topology");
-  const value = useMemo(() => ({ selection, setSelection, screen, setScreen }), [selection, screen]);
+  const [topologyView, setTopologyView] = useState<TopologyView>(defaultTopologyView);
+  const value = useMemo(() => ({ selection, setSelection, screen, setScreen, topologyView, setTopologyView }), [selection, screen, topologyView]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

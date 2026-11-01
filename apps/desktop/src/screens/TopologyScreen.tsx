@@ -2,6 +2,7 @@ import cytoscape, { type Core, type StylesheetJson } from "cytoscape";
 import { iconDataUri, roleIcon } from "../lib/topologyIcons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { edgeMotions, newNodes } from "../lib/activity";
+import { setActivityLink, viewportFor, viewportKey } from "../lib/topologyView";
 import { TopologyActivity } from "./TopologyActivity";
 import { useCapture } from "../app/capture";
 import { useImport } from "../app/imported";
@@ -302,6 +303,9 @@ const MAX_FIT_ZOOM = 1;
 /** Fit the graph, but never zoom a small graph in beyond MAX_FIT_ZOOM. */
 const ACTIVITY_KEY = "calm.topology.activity";
 
+/** The live graph last read during a capture, shown at once when Topology is opened again. */
+let lastPolled: { graph: GraphSnapshot } | null = null;
+
 /** "Live activity" is on unless the viewer turned it off. */
 function readActivityPref(): boolean {
   try {
@@ -386,16 +390,29 @@ export function TopologyScreen() {
   const { selection, setSelection } = useSelection();
   const [timeOpen, setTimeOpen] = useState(false);
   const [windowView, setWindowView] = useState<GraphView | null>(null);
-  const [observedOnly, setObservedOnly] = useState(false);
+  // Overlays and zoom live in the selection context: they survive a trip to Traffic.
+  const { topologyView, setTopologyView } = useSelection();
+  const observedOnly = topologyView.observedOnly;
+  const setObservedOnly = (f: (v: boolean) => boolean) => setTopologyView((v) => ({ ...v, observedOnly: f(v.observedOnly) }));
   // Overlays are off by default (design §5).
-  const [trafficToggle, setShowTraffic] = useState(false);
+  const trafficToggle = topologyView.showTraffic;
+  const setShowTraffic = (next: boolean | ((v: boolean) => boolean)) =>
+    setTopologyView((v) => ({ ...v, showTraffic: typeof next === "function" ? next(v.showTraffic) : next }));
+  const viewRef = useRef(topologyView);
+  viewRef.current = topologyView;
   const { running: capturing, view: captureView, activity, firstSeen, seenByUser, markSeen, pulsed, markPulsed } = useCapture();
   const imp = useImport();
   const [activityOn, setActivityOn] = useState(readActivityPref);
   const reduced = useReducedMotion();
   const [cyInst, setCyInst] = useState<Core | null>(null);
   // While capturing, the live graph is re-read every 5 s; redrawn only when it changed.
-  const [polledGraph, setPolledGraph] = useState<GraphSnapshot | null>(null);
+  const [polledGraph, setPolledGraphState] = useState<GraphSnapshot | null>(() => lastPolled?.graph ?? null);
+  const setPolledGraph = (f: GraphSnapshot | null | ((g: GraphSnapshot | null) => GraphSnapshot | null)) =>
+    setPolledGraphState((cur) => {
+      const next = typeof f === "function" ? f(cur) : f;
+      lastPolled = next ? { graph: next } : null;
+      return next;
+    });
   // Imported files and saved snapshots are shown on their own, never merged
   // with this Mac's live graph.
   const r = resolveSource(imp.source, liveGraph, imp.view, imp.saved);
@@ -541,11 +558,23 @@ export function TopologyScreen() {
       if (evt.target === cy) setSelection({ ...selection, subjectId: null });
     });
     if (selection.subjectId) cy.getElementById(selection.subjectId).select();
-    // A small graph (e.g. a narrow time window) should not be blown up to fill the canvas.
-    fitCapped(cy, 40);
+    // Back from another screen with the same graph: keep the user's zoom and pan.
+    // Otherwise a small graph should not be blown up to fill the canvas.
+    const key = viewportKey(sourceKey, graphSignature(graph), { showTraffic, observedOnly });
+    const saved = viewportFor(viewRef.current.viewport, key);
+    if (saved) cy.viewport({ zoom: saved.zoom, pan: saved.pan });
+    else fitCapped(cy, 40);
+    let timer: number | undefined;
+    cy.on("viewport", () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (!cy.destroyed()) setTopologyView((v) => ({ ...v, viewport: { key, zoom: cy.zoom(), pan: { ...cy.pan() } } }));
+      }, 250);
+    });
     cyRef.current = cy;
     setCyInst(cy);
     return () => {
+      window.clearTimeout(timer);
       cy.destroy();
       cyRef.current = null;
       setCyInst(null);
@@ -564,7 +593,11 @@ export function TopologyScreen() {
 
   // Re-fit when the inspector opens or closes: the canvas width changes.
   const inspectorOpen = subject !== null;
+  const lastInspector = useRef(inspectorOpen);
   useEffect(() => {
+    // Only on an actual open/close: on mount the graph already has its (restored) viewport.
+    if (lastInspector.current === inspectorOpen) return;
+    lastInspector.current = inspectorOpen;
     const cy = cyRef.current;
     if (!cy) return;
     cy.resize();
@@ -657,6 +690,7 @@ export function TopologyScreen() {
               const v = !activityOn;
               setActivityOn(v);
               saveActivityPref(v);
+              setTopologyView((tv) => setActivityLink(tv, v));
             }}
           >
             {t("topology.tool.activity")}
