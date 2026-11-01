@@ -5,12 +5,14 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { findingsList, type CheckResult, type StoredRun } from "../lib/assess";
 import { claimKey, confidenceText, countByStatus, fromText, outcomeText, positionKey, reasonKey, resultId, severityKey, sortResults, statusKey } from "../lib/findingsView";
+import { todoKey } from "../lib/findingDetail";
 import { fmtLocal } from "../lib/format";
 
 /**
- * Findings (M2): results of the authorized checks. Status, severity and
- * confidence are separate; every result shows what was verified, what was
- * not, and the probes behind it.
+ * Findings: results of the authorized checks. Status, severity and
+ * confidence are separate. The detail of a result always has six parts
+ * (lib/findingDetail): saw · shows · does not show · what to do · evidence ·
+ * method and limits.
  */
 
 function StatusBadge({ r }: { r: CheckResult }) {
@@ -20,6 +22,18 @@ function StatusBadge({ r }: { r: CheckResult }) {
       <span className="finding-mark" aria-hidden />
       {t(statusKey(r.status))}
     </span>
+  );
+}
+
+/** A list of claims, or one line saying there are none: every part of the detail is always shown. */
+function Claims({ items, empty, className }: { items: string[]; empty: string; className: string }) {
+  if (items.length === 0) return <p className="meta">{empty}</p>;
+  return (
+    <ul className={`claims ${className}`}>
+      {items.map((c) => (
+        <li key={c}>{c}</li>
+      ))}
+    </ul>
   );
 }
 
@@ -54,33 +68,14 @@ function Detail({ r, run, onClose }: { r: CheckResult; run: StoredRun; onClose: 
           <dt>{t("assess.from")}</dt>
           <dd>{t(positionKey(run.run.vantage ?? "unknown"))}</dd>
         </dl>
+        <h3 className="subsection">{t("finding.saw")}</h3>
         <p>{t(reasonKey(r.reason))}</p>
-        {r.verified.length > 0 && (
-          <>
-            <h3 className="subsection">{t("finding.verified")}</h3>
-            <ul className="claims verified">
-              {r.verified.map((c) => (
-                <li key={c}>{claim(c)}</li>
-              ))}
-            </ul>
-          </>
-        )}
-        {r.unverified.length > 0 && (
-          <>
-            <h3 className="subsection">{t("finding.unverified")}</h3>
-            <ul className="claims unverified">
-              {r.unverified.map((c) => (
-                <li key={c}>{claim(c)}</li>
-              ))}
-            </ul>
-          </>
-        )}
-        {r.status === "fail" && (
-          <>
-            <h3 className="subsection">{t("finding.action")}</h3>
-            <p>{t(`check.${r.check}.action` as MessageKey)}</p>
-          </>
-        )}
+        <h3 className="subsection">{t("finding.verified")}</h3>
+        <Claims items={r.verified.map(claim)} empty={t("finding.shows.none")} className="verified" />
+        <h3 className="subsection">{t("finding.unverified")}</h3>
+        <Claims items={r.unverified.map(claim)} empty={t("finding.notShows.none")} className="unverified" />
+        <h3 className="subsection">{t("finding.action")}</h3>
+        <p>{fromText(todoKey(r), run.run.vantage, t)}</p>
         <h3 className="subsection">{t("finding.evidence")}</h3>
         {r.ports.length === 0 ? (
           <p className="meta">{t("finding.noProbes")}</p>
@@ -91,17 +86,18 @@ function Detail({ r, run, onClose }: { r: CheckResult; run: StoredRun; onClose: 
                 <span className="mono">
                   {r.target}:{p.port}
                 </span>{" "}
-                — {outcomeText(p.outcome, t)}
+                · {outcomeText(p.outcome, t)}
               </li>
             ))}
           </ul>
         )}
+        <h3 className="subsection">{t("finding.methodTitle")}</h3>
+        <p>{t("finding.method")}</p>
+        <p>{t(`check.${r.check}.limits` as MessageKey)}</p>
         <p className="meta small">
-          {t("finding.method")} · {t("finding.run")} <span className="mono">{fmtLocal(run.run.started_at_ms)}</span> · scope{" "}
-          <span className="mono">{run.run.scope_id.slice(0, 8)}</span>
+          {t("finding.run")} <span className="mono">{fmtLocal(run.run.started_at_ms)}</span> · scope <span className="mono">{run.run.scope_id.slice(0, 8)}</span>
           {run.run.receiver_confirmed && <> · {t("finding.receiverConfirmed")}</>}
         </p>
-        <p className="meta small">{t(`check.${r.check}.limits` as MessageKey)}</p>
       </div>
     </aside>
   );

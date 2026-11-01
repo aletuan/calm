@@ -44,6 +44,8 @@ describe("i18n", () => {
       ...PURPOSES.flatMap((p) => [`purpose.${p}`, `purpose.${p}.why`]),
       ...FLOW_COLUMNS.map((c) => `traffic.col.${c}`),
       ...["capture_host", "local_peer", "external_destinations"].flatMap((r) => [`explain.${r}.what`, `explain.${r}.not`]),
+      // "What to do" for results that are not a failure (lib/findingDetail.todoKey).
+      ...["pass", "silent_unconfirmed", "silent", "local_error", "denied", "stopped", "no_target"].map((x) => `finding.todo.${x}`),
     ];
     for (const k of dynamic) expect(en, k).toHaveProperty([k]);
   });
@@ -60,7 +62,22 @@ describe("i18n", () => {
     expect(en["check.S01.limits"]).toMatch(/does not show that anyone can log in/);
     expect(vi["check.S01.limits"]).toMatch(/Không cho thấy ai đăng nhập được/);
     // Where the Mac stood is filled in, never assumed to be Guest Wi-Fi.
-    for (const d of [en, vi]) for (const k of ["check.S01.title", "check.N01.title", "check.S01.short", "check.N03.short", "check.N01.short", "finding.claim.tcp_accepted"] as const) expect(d[k], k).toContain("{from}");
+    for (const d of [en, vi]) for (const k of ["check.S01.title", "check.N01.title", "check.S01.short", "check.N03.short", "check.N01.short", "finding.claim.tcp_accepted", "check.N03.action", "check.N01.action"] as const) expect(d[k], k).toContain("{from}");
+    for (const d of [en, vi]) for (const [k, v] of Object.entries(d)) if (k.startsWith("check.")) expect(/Guest Wi-Fi|Wi-Fi khách|SSID khách|guest SSID/.test(v), `${k}: ${v}`).toBe(false);
+  });
+
+  it("result texts claim no more than the evidence", () => {
+    // A reset means packets got through to something: never "nothing reachable".
+    expect(en["finding.reason.all_refused"]).not.toMatch(/nothing reachable/i);
+    expect(vi["finding.reason.all_refused"]).not.toMatch(/không tới được gì/i);
+    // A reset may come from a firewall in front of the host.
+    expect(en["finding.reason.all_refused"]).toMatch(/firewall/);
+    // Silence with a confirmed receiver is likely blocking, not proven blocking (inferred).
+    expect(en["finding.reason.silent_confirmed_listener"]).toMatch(/likely/);
+    expect(vi["finding.reason.silent_confirmed_listener"]).toMatch(/nhiều khả năng/);
+    // Snapshots can be saved to a session, so capture consent must not promise "nothing on disk".
+    expect(en["traffic.consent.memory"]).not.toMatch(/Nothing is written to disk/);
+    expect(vi["traffic.consent.memory"]).not.toMatch(/Chưa ghi gì ra đĩa/);
   });
   // Voice and terminology rules (docs/design/02-voice-and-terminology.md).
   describe("voice rules", () => {
@@ -115,10 +132,12 @@ describe("i18n", () => {
       for (const [k, v] of entries(vi)) expect(/ủy|(h|kh|x)óa/i.test(v), `${k}: ${v}`).toBe(false);
     });
 
-    it("one term per concept: authorization reference is \"mã uỷ quyền\", inferred is \"suy luận\"", () => {
+    it("one term per concept: \"mã uỷ quyền\", \"suy luận\", \"packet\", \"tóm tắt flow\"", () => {
       for (const [k, v] of entries(vi)) {
         expect(/tham chiếu/i.test(v), `${k}: ${v}`).toBe(false);
         expect(/suy ra/i.test(v), `${k}: ${v}`).toBe(false);
+        // Packet stays English like flow and capture; "flow summary" is translated.
+        expect(/gói tin|flow summary/i.test(v), `${k}: ${v}`).toBe(false);
       }
     });
 
@@ -131,14 +150,10 @@ describe("i18n", () => {
       }
     });
 
-    // Batch 2 (forms and errors). Batch 3 extends these groups to the rest.
-    const REWRITTEN = ["scope", "session", "import", "store", "field", "save", "perm", "time", "position", "role"];
-    const rewritten = (d: Record<string, string>) => entries(d).filter(([k]) => REWRITTEN.includes(k.split(".")[0]!));
-
     it("an input error says what is accepted, as a full sentence with nothing hidden in parentheses", () => {
       for (const d of [en, vi])
         for (const [k, v] of entries(d)) {
-          if (!/^(scope|session)\.err\./.test(k)) continue;
+          if (!/^(scope|session|assess)\.err\./.test(k)) continue;
           expect(v[0] !== v[0]!.toLowerCase(), `${k} starts with a capital: ${v}`).toBe(true);
           expect(v.endsWith("."), `${k} ends with a period: ${v}`).toBe(true);
           expect(v.includes("("), `${k}: ${v}`).toBe(false);
@@ -146,15 +161,29 @@ describe("i18n", () => {
     });
 
     it("a system error names what Calm could not do", () => {
-      for (const d of [en, vi]) for (const k of ["store.locked.title", "import.err.title", "scope.err.store", "save.failedLine"] as const) expect(d[k], k).toMatch(/^Calm /);
+      for (const d of [en, vi]) for (const k of ["store.locked.title", "import.err.title", "scope.err.store", "save.failedLine", "traffic.error.title", "overview.error", "assess.err.store"] as const) expect(d[k], k).toMatch(/^Calm /);
     });
 
-    it("rewritten text uses periods, not dashes, and no internal milestone names", () => {
+    it("text uses periods, not dashes, and no internal milestone or level names", () => {
+      // The release stage in the footer ("Beta M2") is the one place a milestone name is shown on purpose.
       for (const d of [en, vi])
-        for (const [k, v] of rewritten(d)) {
+        for (const [k, v] of entries(d)) {
           expect(v.includes(" — "), `${k}: ${v}`).toBe(false);
-          expect(/\bM\d(\.\d)?\b/.test(v), `${k}: ${v}`).toBe(false);
+          expect(/\bL\d\b/.test(v), `${k}: ${v}`).toBe(false);
+          if (!k.startsWith("footer.")) expect(/\bM\d(\.\d)?\b/.test(v), `${k}: ${v}`).toBe(false);
         }
+    });
+
+    it("Vietnamese never shouts and keeps statuses in Vietnamese", () => {
+      for (const [k, v] of entries(vi)) {
+        expect(/\b(KHÔNG|CHƯA|ĐÃ)\b/u.test(v), `${k}: ${v}`).toBe(false);
+        expect(/\b(pass|unverified|inferred|validated)\b/i.test(v), `${k}: ${v}`).toBe(false);
+      }
+    });
+
+    it("the mode shown in the context bar uses one word for passive", () => {
+      expect(vi["context.passive"]).toMatch(/^Thụ động/);
+      expect(vi["context.scoped"]).toMatch(/^Thụ động/);
     });
   });
 });

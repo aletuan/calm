@@ -285,7 +285,11 @@ function CaptureControl() {
     return (
       <div className="notice">
         <strong>{t(problem.state === "no_interface" ? "traffic.noIface.title" : "traffic.error.title")}</strong>
-        <p className="mono meta">{"detail" in problem ? problem.detail : ""}</p>
+        {"detail" in problem && problem.detail && (
+          <p className="meta error-detail">
+            {t("error.detail")}: <span className="mono">{problem.detail}</span>
+          </p>
+        )}
         <button className="chip" onClick={() => void recheck()}>
           {t("traffic.retry")}
         </button>
@@ -750,7 +754,10 @@ function LiveTraffic() {
       )}
       {view?.stats.error && (
         <div className="notice">
-          {t("traffic.error.title")}: <span className="mono">{view.stats.error}</span>
+          <strong>{t("traffic.error.title")}</strong>
+          <p className="meta error-detail">
+            {t("error.detail")}: <span className="mono">{view.stats.error}</span>
+          </p>
         </div>
       )}
 

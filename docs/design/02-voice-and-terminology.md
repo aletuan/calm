@@ -1,6 +1,6 @@
 # Calm: voice, text patterns and terminology
 
-**Status:** Accepted, 2026-11-01. Batch 2 (forms and errors) applied the same day. The mechanical rules are enforced by `apps/desktop/src/i18n/i18n.test.ts` ("voice rules").
+**Status:** Accepted, 2026-11-01. Applied to every string in three batches the same day (navigation; forms and errors; technical content). The mechanical rules are enforced by `apps/desktop/src/i18n/i18n.test.ts` ("voice rules").
 
 ## Voice
 
@@ -55,7 +55,8 @@ When these four traits conflict, the earlier one wins:
    - Ranges use an en dash (1–10).
    - VI uses a decimal comma (0,5 giây).
 8. **Avoid.**
-   - EN: invalid, failed, please, simply, obviously, fatal, and internal build words (skeleton, alpha, stub, L0).
+   - EN: invalid, failed, please, simply, obviously, fatal, and internal build words (skeleton, alpha, stub).
+   - Internal level and milestone names (L0, L1, M1.3, M2). The footer's release stage ("Beta M2") is the only exception.
    - VI: vui lòng, không hợp lệ, thất bại.
 9. **Certainty matches the evidence.** "Calm saw" (observed), "likely" (inferred), "not checked" (unverified). Never claim "safe" or "secure" outright.
 10. **One spelling.** VI uses the older tone placement throughout: uỷ, hoá, khoá, xoá (not ủy, hóa, khóa, xóa).
@@ -74,7 +75,7 @@ When these four traits conflict, the earlier one wins:
 | Empty state | Title stating the situation, 1–2 sentences with the reason and next step, one button |
 | Input error | The value that is accepted, as a full sentence ("Enter ports from 1 to 65535."). Several errors are listed one per line, under the buttons |
 | System error | Title: "Calm could not…". Body: the cause if certain, whether data is safe, what to do. A raw code or size goes on a separate "Detail" line, never first |
-| Finding detail | What Calm saw, What this shows, What this does not show, What to do, Evidence, Method and limits |
+| Finding detail | Always six parts, in this order: What Calm saw, What this shows, What this does not show, What to do, Evidence, Method and limits. An empty part says so in one line. "What to do" is never empty: a failure or warning gets the check's fix; any other result says what would confirm or change it (`lib/findingDetail.ts`) |
 
 ## Terminology
 
@@ -102,5 +103,8 @@ When these four traits conflict, the earlier one wins:
 | Evidence | evidence | bằng chứng |
 | Owner's written permission, by id | authorization reference | mã uỷ quyền |
 | Inferred | inferred | suy luận (never "suy ra") |
+| Mode with no probes | passive | thụ động |
+| Network unit | packet | packet (kept in English, like flow; never "gói tin") |
+| Stored flow record | flow summary | tóm tắt flow |
 
 The research and the before/after examples behind these rules live in the shared proposal "Calm — Giọng văn và cách viết label, guidance".

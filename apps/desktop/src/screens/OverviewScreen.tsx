@@ -121,7 +121,14 @@ export function OverviewScreen() {
         </button>
       </header>
 
-      {error && <div className="notice">{t("overview.error")}: <span className="mono">{error}</span></div>}
+      {error && (
+        <div className="notice" role="alert">
+          <p>{t("overview.error")}</p>
+          <p className="meta error-detail">
+            {t("error.detail")}: <span className="mono">{error}</span>
+          </p>
+        </div>
+      )}
       {profile && <PermissionNotice p={profile} />}
 
       {profile && (
