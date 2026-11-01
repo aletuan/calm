@@ -38,7 +38,9 @@ export function App() {
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      {/* Overlay title bar: this strip is where the window is grabbed (see windowChrome.test). */}
+      <div className="titlebar-drag" data-tauri-drag-region aria-hidden />
+      <aside className="sidebar" data-tauri-drag-region="deep">
         <div className="brand">
           <img className="brand-icon" src={calmIcon} alt="" aria-hidden />
           Calm
@@ -64,7 +66,7 @@ export function App() {
       </aside>
 
       <main className="main">
-        <div className="context-bar">
+        <div className="context-bar" data-tauri-drag-region="deep">
           <span>
             {t("context.network")}: <strong>{networkLabel}</strong>
           </span>
