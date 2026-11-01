@@ -40,3 +40,9 @@ A real run (home network, one admin target, S01 Fail) showed three gaps, now clo
 - **Where the Mac stands is stated, not assumed.** The scope records `vantage: guest | main | unknown` (required in the form; "not sure" is allowed). Each run copies it. Titles and claims say "reachable from Guest Wi-Fi / the main network / this network". Scopes and runs stored earlier read as `unknown`.
 - **Targets outside the Mac's subnet are flagged in preflight** (`PlanItem.outside_subnet`, `calm_orchestrator::in_subnet`). They are still allowed (private address, explicit scope), but the user sees that the probe is routed through the gateway to another device.
 - **Not tested has no confidence.** `CheckResult.confidence` is `None` whenever status is Not tested; the UI shows "—", also for older runs that stored "high".
+
+## Revision 2026-11-01 — capability scopes (proposed, ADR-011)
+If ADR-011 is accepted, it replaces three points above; everything else stands:
+- **Targets:** private CIDR `ranges` (at most /24, with required `exclusions`) are allowed next to literal addresses. Public addresses stay refused.
+- **Level:** no longer fixed at L1. A scope lists capabilities (`tcp_connect`, `host_discovery`, `reverse_dns`, `syn_scan`, `service_detection`, `os_detection`, `nse`), each ticked by the owner.
+- **Enforcement:** Nmap runs are authorized per run plan (every target, port, flag and script) instead of per probe. Calm's own TCP-connect runner keeps per-probe authorization.
