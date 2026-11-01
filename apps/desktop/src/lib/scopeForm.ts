@@ -1,4 +1,4 @@
-import type { DraftError, NetworkPosition, ScopeDraft, TargetRole } from "./assess";
+import type { Capability, DraftError, NetworkPosition, ScopeDraft, TargetRole } from "./assess";
 import type { MessageKey } from "../i18n/en";
 
 /** The "new scope" form as typed; numbers and ports are still text. */
@@ -6,6 +6,12 @@ export interface TargetRow {
   address: string;
   ports: string;
   role: TargetRole;
+  label: string;
+}
+
+export interface RangeRow {
+  cidr: string;
+  ports: string;
   label: string;
 }
 
@@ -20,9 +26,17 @@ export interface ScopeForm {
   /** "" until the user picks one: there is no safe default. */
   vantage: NetworkPosition | "";
   targets: TargetRow[];
+  /** ADR-011. Starts as TCP connect only, the M2 behaviour. */
+  capabilities: Capability[];
+  ranges: RangeRow[];
+  /** Addresses never touched, as typed (one per line, or separated by commas). */
+  exclusions: string;
+  nse_scripts: string[];
 }
 
 export const VALIDITY_CHOICES = ["1", "4", "8", "24", "72", "168"] as const;
+
+export const emptyRange = (): RangeRow => ({ cidr: "", ports: "", label: "" });
 
 export const emptyTarget = (role: TargetRole = "admin_interface"): TargetRow => ({ address: "", ports: "", role, label: "" });
 
@@ -36,6 +50,10 @@ export const emptyScopeForm = (operator = ""): ScopeForm => ({
   confirmed: false,
   vantage: "",
   targets: [emptyTarget()],
+  capabilities: ["tcp_connect"],
+  ranges: [],
+  exclusions: "",
+  nse_scripts: [],
 });
 
 /** "80, 443 8443" → [80, 443, 8443]; null when any piece is not a port number. */
@@ -51,7 +69,10 @@ export function parsePorts(text: string): number[] | null {
   return out;
 }
 
-export type FormProblem = { kind: "port_text"; index: number } | { kind: "number_text"; field: "hours" | "rate" | "timeout_s" };
+export type FormProblem =
+  | { kind: "port_text"; index: number }
+  | { kind: "range_port_text"; index: number }
+  | { kind: "number_text"; field: "hours" | "rate" | "timeout_s" };
 
 /**
  * Turn the form into a draft for the shell. Only text that cannot become a
@@ -72,6 +93,11 @@ export function toDraft(f: ScopeForm, now: number): { ok: true; draft: ScopeDraf
     if (!ports) problems.push({ kind: "port_text", index });
     return { address: t.address.trim(), ports: ports ?? [], role: t.role, label: t.label };
   });
+  const ranges = f.ranges.map((r, index) => {
+    const ports = parsePorts(r.ports);
+    if (!ports) problems.push({ kind: "range_port_text", index });
+    return { cidr: r.cidr.trim(), ports: ports ?? [], label: r.label };
+  });
   if (problems.length) return { ok: false, problems };
   return {
     ok: true,
@@ -85,6 +111,10 @@ export function toDraft(f: ScopeForm, now: number): { ok: true; draft: ScopeDraf
       timeout_ms: Math.round(timeout * 1000),
       authorization_confirmed: f.confirmed,
       vantage: f.vantage || null,
+      capabilities: f.capabilities,
+      ranges,
+      exclusions: f.exclusions.split(/[\s,;]+/).filter(Boolean),
+      nse_scripts: f.nse_scripts,
     },
   };
 }
@@ -101,6 +131,13 @@ const TARGET_ROW_ERRORS: DraftError["kind"][] = ["bad_address", "duplicate_addre
 /** Which target row an error belongs to, if any. */
 export function draftErrorRow(e: DraftError): number | null {
   return "index" in e && TARGET_ROW_ERRORS.includes(e.kind) ? e.index : null;
+}
+
+const RANGE_ROW_ERRORS: DraftError["kind"][] = ["bad_range", "range_too_large", "bad_range_ports"];
+
+/** Which range row an error belongs to, if any. */
+export function draftErrorRangeRow(e: DraftError): number | null {
+  return "index" in e && RANGE_ROW_ERRORS.includes(e.kind) ? e.index : null;
 }
 
 export const DRAFT_ERROR_KINDS: DraftError["kind"][] = [

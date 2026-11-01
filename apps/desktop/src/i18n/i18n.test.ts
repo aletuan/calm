@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CHECKS, POSITIONS, TARGET_ROLES } from "../lib/assess";
 import { FLOW_COLUMNS } from "../lib/columns";
 import { DRAFT_ERROR_KINDS } from "../lib/scopeForm";
+import { CAPABILITIES, NSE_ALLOWLIST } from "../lib/capabilities";
 import { PURPOSES } from "../lib/flowPurpose";
 import { RETENTION_CHOICES, parseSessionForm, emptyForm, type FormError } from "../lib/sessionForm";
 import { en } from "./en";
@@ -44,6 +45,10 @@ describe("i18n", () => {
       ...PURPOSES.flatMap((p) => [`purpose.${p}`, `purpose.${p}.why`]),
       ...FLOW_COLUMNS.map((c) => `traffic.col.${c}`),
       ...["capture_host", "local_peer", "external_destinations"].flatMap((r) => [`explain.${r}.what`, `explain.${r}.not`]),
+      // ADR-011 scope form (lib/capabilities).
+      ...CAPABILITIES.flatMap((c) => [`capability.${c}`, `capability.${c}.sends`]),
+      ...["L1", "L2"].map((l) => `scope.level.${l}`),
+      ...NSE_ALLOWLIST.map((n) => `nse.${n}`),
       // "What to do" for results that are not a failure (lib/findingDetail.todoKey).
       ...["pass", "silent_unconfirmed", "silent", "local_error", "denied", "stopped", "no_target"].map((x) => `finding.todo.${x}`),
     ];
@@ -55,6 +60,8 @@ describe("i18n", () => {
   });
 
   it("product claims stay honest in both languages", () => {
+    // The user attests to the capabilities they ticked, not a fixed sentence (ADR-011).
+    for (const d of [en, vi]) expect(d["scope.confirm"]).toContain("{caps}");
     // Imported data must never be described as observed by this Mac.
     expect(en["import.banner.title"]).toMatch(/not observed by this Mac/);
     expect(vi["import.banner.title"]).toMatch(/không phải do Mac này quan sát/);

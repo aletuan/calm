@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { draftErrorKey, draftErrorRow, emptyScopeForm, emptyTarget, parsePorts, toDraft } from "./scopeForm";
+import { draftErrorKey, draftErrorRangeRow, draftErrorRow, emptyScopeForm, emptyTarget, parsePorts, toDraft } from "./scopeForm";
 
 const NOW = 1_800_000_000_000;
 
@@ -64,3 +64,43 @@ describe("draft errors", () => {
     expect(draftErrorRow({ kind: "script_not_allowed", index: 0 })).toBeNull();
   });
 });
+
+describe("ranges, exclusions and capabilities in the draft (ADR-011)", () => {
+  const filled = () => ({
+    ...emptyScopeForm("Andy"),
+    authorization_reference: "R",
+    granted_by: "O",
+    targets: [{ address: "192.168.1.1", ports: "443", role: "admin_interface" as const, label: "" }],
+  });
+
+  it("an untouched form asks for TCP connect only, with no ranges", () => {
+    const r = toDraft(filled(), 0);
+    if (!r.ok) throw new Error("draft");
+    expect(r.draft.capabilities).toEqual(["tcp_connect"]);
+    expect(r.draft.ranges).toEqual([]);
+    expect(r.draft.exclusions).toEqual([]);
+    expect(r.draft.nse_scripts).toEqual([]);
+  });
+
+  it("carries ranges with their ports and splits exclusions on lines, commas or spaces", () => {
+    const f = { ...filled(), ranges: [{ cidr: " 192.168.1.0/24 ", ports: "22, 80", label: "shop" }], exclusions: "192.168.1.50\n192.168.1.51, 192.168.1.52  " };
+    const r = toDraft(f, 0);
+    if (!r.ok) throw new Error("draft");
+    expect(r.draft.ranges).toEqual([{ cidr: "192.168.1.0/24", ports: [22, 80], label: "shop" }]);
+    expect(r.draft.exclusions).toEqual(["192.168.1.50", "192.168.1.51", "192.168.1.52"]);
+  });
+
+  it("reports range ports it cannot read, by range row", () => {
+    const f = { ...filled(), ranges: [{ cidr: "192.168.1.0/24", ports: "80, x", label: "" }] };
+    expect(toDraft(f, 0)).toEqual({ ok: false, problems: [{ kind: "range_port_text", index: 0 }] });
+  });
+
+  it("range errors belong to range rows, not target rows", () => {
+    expect(draftErrorRangeRow({ kind: "bad_range", index: 1 })).toBe(1);
+    expect(draftErrorRangeRow({ kind: "range_too_large", index: 0 })).toBe(0);
+    expect(draftErrorRangeRow({ kind: "bad_range_ports", index: 2 })).toBe(2);
+    expect(draftErrorRangeRow({ kind: "bad_address", index: 0, reason: "not_private" })).toBeNull();
+    expect(draftErrorRangeRow({ kind: "bad_exclusion", index: 0 })).toBeNull();
+  });
+});
+

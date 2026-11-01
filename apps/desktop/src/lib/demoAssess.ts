@@ -18,6 +18,7 @@ import type {
   StoredRun,
 } from "./assess";
 import type { Confidence } from "./ipc";
+import { CAPABILITIES, capabilityLevel, NSE_ALLOWLIST } from "./capabilities";
 
 /**
  * Browser-preview stand-in for the M2 shell commands. Same rules as
@@ -63,6 +64,47 @@ export function checkAddress(raw: string): { ok: true; address: string } | { ok:
   return { ok: false, reason: "not_private" };
 }
 
+/** Port of `parse_range`: a private IPv4 network address, prefix ≤ 32, canonical. */
+export function parseRange(cidr: string): { net: string; prefix: number } | null {
+  const [net, prefixText] = cidr.trim().split("/");
+  const o = net ? v4(net) : null;
+  if (!o || prefixText === undefined || !/^\d{1,2}$/.test(prefixText)) return null;
+  const prefix = Number(prefixText);
+  if (prefix > 32) return null;
+  const n = ((o[0]! << 24) | (o[1]! << 16) | (o[2]! << 8) | o[3]!) >>> 0;
+  const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+  if (((n & mask) >>> 0) !== n || !checkAddress(net!).ok) return null;
+  return { net: o.join("."), prefix };
+}
+
+/** Port of the ADR-011 rules in `approve` (check_capabilities, check_ranges, check_exclusions). */
+function validateCapabilities(d: ScopeDraft, e: DraftError[]) {
+  const caps = d.capabilities ?? ["tcp_connect"];
+  const ranges = d.ranges ?? [];
+  const scripts = d.nse_scripts ?? [];
+  if (caps.length === 0) e.push({ kind: "no_capabilities" });
+  if (caps.includes("host_discovery") && ranges.length === 0) e.push({ kind: "host_discovery_needs_range" });
+  const nse = caps.includes("nse");
+  if (!nse && scripts.length) e.push({ kind: "scripts_need_nse" });
+  if (nse && !scripts.length) e.push({ kind: "nse_needs_scripts" });
+  scripts.forEach((name, index) => {
+    if (!(NSE_ALLOWLIST as readonly string[]).includes(name)) e.push({ kind: "script_not_allowed", index });
+  });
+  ranges.forEach((r, index) => {
+    const parsed = parseRange(r.cidr);
+    if (!parsed) return void e.push({ kind: "bad_range", index });
+    if (parsed.prefix < 24) return void e.push({ kind: "range_too_large", index });
+    const ports = [...new Set(r.ports)];
+    if (!ports.length || ports.length > 16 || ports.includes(0)) e.push({ kind: "bad_range_ports", index });
+  });
+  const exclusions = d.exclusions ?? [];
+  if (ranges.length && !exclusions.length) e.push({ kind: "exclusions_required" });
+  exclusions.forEach((x, index) => {
+    const t = x.trim();
+    if (!v4(t) && !(t.includes(":") && /^[0-9a-fA-F:]+$/.test(t))) e.push({ kind: "bad_exclusion", index });
+  });
+}
+
 export function validateDraft(d: ScopeDraft, now: number, network: NetworkBinding | null): DraftError[] {
   const e: DraftError[] = [];
   if (!d.authorization_reference.trim()) e.push({ kind: "authorization_required" });
@@ -71,7 +113,7 @@ export function validateDraft(d: ScopeDraft, now: number, network: NetworkBindin
   const texts = [d.authorization_reference, d.operator, d.granted_by, ...d.targets.map((t) => t.label)];
   if (texts.some((t) => [...t].length > 200)) e.push({ kind: "text_too_long" });
   if (!d.authorization_confirmed) e.push({ kind: "not_confirmed" });
-  if (d.targets.length === 0) e.push({ kind: "no_targets" });
+  if (d.targets.length === 0 && !(d.ranges ?? []).length) e.push({ kind: "no_targets" });
   if (d.targets.length > 16) e.push({ kind: "too_many_targets" });
   const seen = new Set<string>();
   d.targets.forEach((t, index) => {
@@ -84,6 +126,7 @@ export function validateDraft(d: ScopeDraft, now: number, network: NetworkBindin
     else if (ports.length > 16) e.push({ kind: "too_many_ports", index });
     else if (ports.some((p) => p < 1 || p > 65535 || !Number.isInteger(p))) e.push({ kind: "bad_port", index });
   });
+  validateCapabilities(d, e);
   if (d.expires_at_ms <= now) e.push({ kind: "expiry_in_past" });
   else if (d.expires_at_ms - now > MAX_VALIDITY_MS) e.push({ kind: "expiry_too_far" });
   if (!(d.max_probes_per_second >= 1 && d.max_probes_per_second <= 10)) e.push({ kind: "rate_out_of_range" });
@@ -215,6 +258,8 @@ export class DemoAssess {
     const now = this.now();
     const errors = validateDraft(d, now, this.net);
     if (errors.length) throw { kind: "invalid", detail: errors };
+    // Sorted, deduplicated, in the Rust order (Capability derives Ord).
+    const caps = CAPABILITIES.filter((c) => (d.capabilities ?? ["tcp_connect"]).includes(c));
     const scope: Scope = {
       id: this.id("scope"),
       session_id: sid,
@@ -222,17 +267,16 @@ export class DemoAssess {
       operator: d.operator.trim(),
       granted_by: d.granted_by.trim(),
       targets: d.targets.map((t) => ({ address: (checkAddress(t.address) as { address: string }).address, ports: [...new Set(t.ports)].sort((a, b) => a - b), role: t.role, label: t.label.trim() })),
-      max_level: "L1",
+      max_level: caps.some((c) => capabilityLevel(c) === "L2") ? "L2" : "L1",
       budget: { max_probes_per_second: d.max_probes_per_second, timeout_ms: d.timeout_ms, max_parallel_targets: 1 },
       network: this.net!,
       vantage: d.vantage ?? "unknown",
       approved_at_ms: now,
       expires_at_ms: d.expires_at_ms,
-      // The form has no capability choices yet (ADR-011): same as Rust's default.
-      capabilities: ["tcp_connect"],
-      ranges: [],
-      exclusions: [],
-      nse_scripts: [],
+      capabilities: caps,
+      ranges: (d.ranges ?? []).map((r) => ({ cidr: `${parseRange(r.cidr)!.net}/${parseRange(r.cidr)!.prefix}`, ports: [...new Set(r.ports)].sort((a, b) => a - b), label: r.label.trim() })),
+      exclusions: (d.exclusions ?? []).map((x) => x.trim()),
+      nse_scripts: d.nse_scripts ?? [],
     };
     this.scopes.set(scope.id, { scope, revoked: false });
     return { scope, revoked: false, expired: false };
@@ -284,7 +328,13 @@ export class DemoAssess {
       if (i >= plan.length) return finish();
       const p = plan[i]!;
       const target = `${p.target.includes(":") ? `[${p.target}]` : p.target}:${p.port}`;
-      const outcome: ProbeOutcome = this.stopped ? { kind: "cancelled" } : simulatedOutcome(p.port);
+      // As `authorize`: Calm's own probes need the tcp_connect capability (ADR-011).
+      const allowed = (v.scope.capabilities ?? ["tcp_connect"]).includes("tcp_connect");
+      const outcome: ProbeOutcome = this.stopped
+        ? { kind: "cancelled" }
+        : allowed
+          ? simulatedOutcome(p.port)
+          : { kind: "denied", reason: { kind: "capability_not_granted" } };
       const record: ProbeRecord = { target, role: v.scope.targets.find((t) => t.address === p.target)?.role ?? null, scope_id: outcome.kind === "cancelled" ? null : v.scope.id, started_at_ms: this.now(), outcome };
       probes.push({ check: p.check, record });
       this.progress = { ...this.progress!, done: i + 1, last: record };

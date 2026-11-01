@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProbeOutcome, ScopeDraft } from "./assess";
-import { checkAddress, DemoAssess, evaluateTarget, inSubnet, planOf, validateDraft, DEMO_NETWORK } from "./demoAssess";
+import { checkAddress, DemoAssess, evaluateTarget, inSubnet, parseRange, planOf, validateDraft, DEMO_NETWORK } from "./demoAssess";
 
 const NOW = 1_800_000_000_000;
 
@@ -54,6 +54,62 @@ describe("demo validation", () => {
     expect(validateDraft(draft(), NOW, DEMO_NETWORK)).toEqual([]);
     const e = validateDraft(draft({ authorization_confirmed: false, targets: [], timeout_ms: 100 }), NOW, null).map((x) => x.kind);
     expect(e).toEqual(["not_confirmed", "no_targets", "timeout_out_of_range", "network_unknown"]);
+  });
+});
+
+describe("demo validation of capabilities, ranges and scripts (same as Rust approve, ADR-011)", () => {
+  const kinds = (over: Partial<ScopeDraft>) => validateDraft(draft(over), NOW, DEMO_NETWORK).map((x) => x.kind);
+  const range = (cidr: string, ports = [80]) => ({ cidr, ports, label: "" });
+
+  it("a draft without the new fields is TCP connect only, as before", () => {
+    expect(kinds({})).toEqual([]);
+    expect(kinds({ capabilities: [] })).toEqual(["no_capabilities"]);
+  });
+
+  it.each([
+    ["192.168.68.0/24", null],
+    ["10.20.0.0/28", null],
+    ["100.64.1.0/24", null],
+    ["192.168.68.0/23", "range_too_large"],
+    ["8.8.8.0/24", "bad_range"],
+    ["192.168.68.7/24", "bad_range"],
+    ["fd00::/120", "bad_range"],
+    ["192.168.68.0", "bad_range"],
+    ["192.168.68.0/33", "bad_range"],
+  ])("range %s → %s", (cidr, want) => {
+    const e = kinds({ ranges: [range(cidr)], exclusions: ["192.168.68.50"] });
+    expect(e).toEqual(want ? [want] : []);
+  });
+
+  it("ranges need valid ports and exclusions; exclusions must be addresses", () => {
+    expect(kinds({ ranges: [range("192.168.68.0/24")] })).toEqual(["exclusions_required"]);
+    expect(kinds({ ranges: [range("192.168.68.0/24", [])], exclusions: ["192.168.68.50"] })).toEqual(["bad_range_ports"]);
+    expect(kinds({ ranges: [range("192.168.68.0/24", [0])], exclusions: ["192.168.68.50"] })).toEqual(["bad_range_ports"]);
+    expect(kinds({ ranges: [range("192.168.68.0/24")], exclusions: ["router"] })).toEqual(["bad_exclusion"]);
+    expect(kinds({ targets: [], ranges: [range("10.20.0.0/28")], exclusions: ["10.20.0.1"] })).toEqual([]);
+  });
+
+  it("discovery needs a range; NSE needs allowlisted scripts and scripts need NSE", () => {
+    expect(kinds({ capabilities: ["host_discovery"] })).toEqual(["host_discovery_needs_range"]);
+    expect(kinds({ nse_scripts: ["http-title"] })).toEqual(["scripts_need_nse"]);
+    expect(kinds({ capabilities: ["nse"], nse_scripts: [] })).toEqual(["nse_needs_scripts"]);
+    expect(kinds({ capabilities: ["nse"], nse_scripts: ["smb-brute"] })).toEqual(["script_not_allowed"]);
+    expect(kinds({ capabilities: ["nse"], nse_scripts: ["http-title"] })).toEqual([]);
+  });
+
+  it("parseRange is the port of parse_range", () => {
+    expect(parseRange("192.168.68.0/24")).toEqual({ net: "192.168.68.0", prefix: 24 });
+    expect(parseRange("192.168.68.1/24")).toBeNull();
+    expect(parseRange("1.1.1.0/24")).toBeNull();
+  });
+
+  it("an approved demo scope keeps the capabilities and the highest level", () => {
+    const d = new DemoAssess(() => NOW, () => "s1", (f) => f());
+    const v = d.approve(draft({ capabilities: ["syn_scan", "tcp_connect"], ranges: [range("192.168.1.0/24")], exclusions: [" 192.168.1.50 "] }));
+    expect(v.scope.capabilities).toEqual(["tcp_connect", "syn_scan"]);
+    expect(v.scope.max_level).toBe("L2");
+    expect(v.scope.ranges).toEqual([{ cidr: "192.168.1.0/24", ports: [80], label: "" }]);
+    expect(v.scope.exclusions).toEqual(["192.168.1.50"]);
   });
 });
 
@@ -123,6 +179,18 @@ describe("DemoAssess", () => {
     d.revoke(v.scope.id);
     expect(d.current()).toBeNull();
     expect(d.list()[0]?.revoked).toBe(true);
+  });
+
+  it("without TCP connect in the scope, every probe of the checks is refused (as authorize)", () => {
+    const q = queue();
+    const d = new DemoAssess(() => NOW, () => "s1", q.timer);
+    d.approve(draft({ capabilities: ["syn_scan"] }));
+    d.run(true);
+    q.drain();
+    const run = d.runs()[0]!.run;
+    expect(run.probes.every((p) => p.record.outcome.kind === "denied")).toBe(true);
+    expect(run.probes[0]!.record.outcome).toEqual({ kind: "denied", reason: { kind: "capability_not_granted" } });
+    expect(run.results.find((r) => r.check === "S01")?.reason).toBe("denied");
   });
 
   it("runs the plan, stores results, and the stop cancels the rest", () => {

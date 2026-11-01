@@ -1093,6 +1093,84 @@ body {
   gap: var(--gap-tight) var(--gap-related);
   align-items: center;
 }
+/* A range row has no role column. */
+.target-row.range-row {
+  grid-template-columns: minmax(150px, 1.2fr) minmax(110px, 1fr) minmax(120px, 1fr) auto;
+}
+/* Exclusions: a short list of addresses, typed one per line. */
+.scope-form .exclusions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+  max-width: 480px;
+  margin-top: var(--gap-field);
+  font-size: var(--text-meta);
+  color: var(--color-text-secondary);
+}
+.scope-form .exclusions textarea {
+  font-size: var(--text-body);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-stroke);
+  border-radius: var(--radius);
+  padding: 6px var(--space-2);
+  resize: vertical;
+}
+.scope-form .exclusions textarea:focus-visible {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 1px;
+}
+/* Capabilities (ADR-011): two groups by level; each item says what it sends. */
+.cap-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--gap-block);
+  max-width: 110ch;
+}
+.cap-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-field);
+  margin: 0;
+  padding: var(--gap-field) var(--gap-block) var(--gap-block);
+  border: 1px solid var(--color-stroke);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.cap-group legend {
+  padding: 0 var(--gap-tight);
+  font-size: var(--text-meta);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.cap-group[data-level="L2"] legend {
+  color: var(--color-semantic-warning);
+}
+.cap-group.scripts {
+  max-width: 110ch;
+  margin-top: var(--gap-block);
+}
+.cap-group.scripts > p {
+  margin: 0;
+}
+.cap-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--gap-related);
+  align-items: start;
+  cursor: pointer;
+}
+.cap-item input {
+  margin-top: 3px;
+}
+.cap-item > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cap-name {
+  font-weight: 500;
+}
 .target-row input,
 .target-row select {
   font: inherit;

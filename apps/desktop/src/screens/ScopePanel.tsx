@@ -4,11 +4,13 @@ import type { MessageKey } from "../i18n/en";
 import { POSITIONS, scopeApprove, scopeList, scopeNetwork, scopeRevoke, TARGET_ROLES, type DraftError, type NetworkBinding, type ScopeError, type ScopeView } from "../lib/assess";
 import { fmtLocal } from "../lib/format";
 import { FormErrors } from "./ErrorText";
-import { draftErrorKey, draftErrorRow, emptyScopeForm, emptyTarget, toDraft, VALIDITY_CHOICES, type FormProblem, type ScopeForm } from "../lib/scopeForm";
+import { CAPABILITIES, capabilityLevel, capsText, NSE_ALLOWLIST, toggleCapability } from "../lib/capabilities";
+import { draftErrorKey, draftErrorRangeRow, draftErrorRow, emptyRange, emptyScopeForm, emptyTarget, toDraft, VALIDITY_CHOICES, type FormProblem, type RangeRow, type ScopeForm } from "../lib/scopeForm";
 
 /**
- * Scope grant (M2.1), step 1 of Assessment: what may be probed, from which
- * network, until when. Approved once; a change means revoke and approve again.
+ * Scope grant, step 1 of Assessment: what may be probed, from which network,
+ * until when, and which kinds of traffic (ADR-011). Approved once; a change
+ * means revoke and approve again.
  */
 
 export function NetworkLine({ n }: { n: NetworkBinding | null }) {
@@ -76,8 +78,22 @@ function ScopeCard({ v, onRevoke, busy }: { v: ScopeView; onRevoke: () => void; 
         <dt>{t("scope.budget")}</dt>
         <dd>
           <span className="mono">{s.budget.max_probes_per_second}</span> {t("scope.perSecond")} · {t("scope.timeout")}{" "}
-          <span className="mono">{s.budget.timeout_ms / 1000}s</span> · {t("scope.oneAtATime")} · L1
+          <span className="mono">{s.budget.timeout_ms / 1000}s</span> · {t("scope.oneAtATime")}
         </dd>
+        <dt>{t("scope.allowed")}</dt>
+        <dd>{capsText(s.capabilities ?? ["tcp_connect"], t)}</dd>
+        {(s.nse_scripts ?? []).length > 0 && (
+          <>
+            <dt>{t("scope.scripts")}</dt>
+            <dd className="mono">{s.nse_scripts.join(", ")}</dd>
+          </>
+        )}
+        {(s.exclusions ?? []).length > 0 && (
+          <>
+            <dt>{t("scope.neverTouched")}</dt>
+            <dd className="mono">{s.exclusions.join(", ")}</dd>
+          </>
+        )}
       </dl>
       <table className="flow-table session-table">
         <thead>
@@ -97,6 +113,14 @@ function ScopeCard({ v, onRevoke, busy }: { v: ScopeView; onRevoke: () => void; 
               <td className="meta">{x.label || "—"}</td>
             </tr>
           ))}
+          {(s.ranges ?? []).map((r) => (
+            <tr key={r.cidr}>
+              <td className="mono">{r.cidr}</td>
+              <td className="mono">{r.ports.join(", ")}</td>
+              <td>{t("scope.col.range")}</td>
+              <td className="meta">{r.label || "—"}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -104,7 +128,9 @@ function ScopeCard({ v, onRevoke, busy }: { v: ScopeView; onRevoke: () => void; 
 }
 
 function problemKey(p: FormProblem): MessageKey {
-  return p.kind === "port_text" ? "scope.err.port_text" : (`scope.err.number.${p.field}` as MessageKey);
+  if (p.kind === "port_text") return "scope.err.port_text";
+  if (p.kind === "range_port_text") return "scope.err.range_port_text";
+  return `scope.err.number.${p.field}` as MessageKey;
 }
 
 function NewScope({ onDone, operator }: { onDone: () => void; operator: string }) {
@@ -125,9 +151,14 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
     ...problems.filter((p) => p.kind === "port_text" && p.index === i).map((p) => t(problemKey(p))),
     ...errors.filter((e) => draftErrorRow(e) === i).map((e) => t(draftErrorKey(e))),
   ];
+  const setRange = (i: number, k: keyof RangeRow, v: string) => setF({ ...f, ranges: f.ranges.map((r, j) => (j === i ? { ...r, [k]: v } : r)) });
+  const rangeErrors = (i: number) => [
+    ...problems.filter((p) => p.kind === "range_port_text" && p.index === i).map((p) => t(problemKey(p))),
+    ...errors.filter((e) => draftErrorRangeRow(e) === i).map((e) => t(draftErrorKey(e))),
+  ];
   const general = [
-    ...problems.filter((p) => p.kind !== "port_text").map((p) => t(problemKey(p))),
-    ...errors.filter((e) => draftErrorRow(e) == null).map((e) => t(draftErrorKey(e))),
+    ...problems.filter((p) => p.kind === "number_text").map((p) => t(problemKey(p))),
+    ...errors.filter((e) => draftErrorRow(e) == null && draftErrorRangeRow(e) == null).map((e) => t(draftErrorKey(e))),
   ];
 
   const submit = async () => {
@@ -240,6 +271,73 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
         + {t("scope.addTarget")}
       </button>
 
+      <h3 className="subsection">{t("scope.ranges")}</h3>
+      <p className="meta small field-hint">{t("scope.rangesHint")}</p>
+      {f.ranges.length > 0 && (
+        <div className="target-rows">
+          {f.ranges.map((r, i) => (
+            <div className="target-row range-row" key={i}>
+              <input className="mono" placeholder="192.168.1.0/24" aria-label={t("scope.col.range")} value={r.cidr} onChange={(e) => setRange(i, "cidr", e.target.value)} />
+              <input className="mono" placeholder="22, 80, 443" aria-label={t("scope.col.ports")} value={r.ports} onChange={(e) => setRange(i, "ports", e.target.value)} />
+              <input placeholder={t("scope.col.label")} aria-label={t("scope.col.label")} value={r.label} onChange={(e) => setRange(i, "label", e.target.value)} />
+              <button type="button" className="chip small" aria-label={t("scope.removeRange")} onClick={() => setF({ ...f, ranges: f.ranges.filter((_, j) => j !== i) })}>
+                ×
+              </button>
+              <FormErrors className="row-error" messages={rangeErrors(i)} />
+            </div>
+          ))}
+        </div>
+      )}
+      <button type="button" className="chip small" onClick={() => setF({ ...f, ranges: [...f.ranges, emptyRange()] })} disabled={f.ranges.length >= 16}>
+        + {t("scope.addRange")}
+      </button>
+      {f.ranges.length > 0 && (
+        <label className="wide exclusions">
+          <span>{t("scope.exclusions")} *</span>
+          <textarea className="mono" rows={3} placeholder="192.168.1.50" value={f.exclusions} onChange={(e) => setF({ ...f, exclusions: e.target.value })} />
+          <span className="meta small">{t("scope.exclusionsHint")}</span>
+        </label>
+      )}
+
+      <h3 className="subsection">{t("scope.capabilities")}</h3>
+      <p className="meta small field-hint">{t("scope.capabilitiesHint")}</p>
+      <div className="cap-groups">
+        {(["L1", "L2"] as const).map((level) => (
+          <fieldset key={level} className="cap-group" data-level={level}>
+            <legend>{t(`scope.level.${level}` as MessageKey)}</legend>
+            {CAPABILITIES.filter((c) => capabilityLevel(c) === level).map((c) => (
+              <label key={c} className="cap-item">
+                <input type="checkbox" checked={f.capabilities.includes(c)} onChange={() => setF(toggleCapability(f, c))} />
+                <span>
+                  <span className="cap-name">{t(`capability.${c}` as MessageKey)}</span>
+                  <span className="meta small">{t(`capability.${c}.sends` as MessageKey)}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        ))}
+      </div>
+      {!f.capabilities.includes("tcp_connect") && <p className="meta small field-hint">{t("scope.checksNote")}</p>}
+      {f.capabilities.includes("nse") && (
+        <fieldset className="cap-group scripts">
+          <legend>{t("scope.scripts")}</legend>
+          <p className="meta small">{t("scope.scriptsHint")}</p>
+          {NSE_ALLOWLIST.map((n) => (
+            <label key={n} className="cap-item">
+              <input
+                type="checkbox"
+                checked={f.nse_scripts.includes(n)}
+                onChange={() => setF({ ...f, nse_scripts: f.nse_scripts.includes(n) ? f.nse_scripts.filter((x) => x !== n) : [...f.nse_scripts, n] })}
+              />
+              <span>
+                <span className="cap-name mono">{n}</span>
+                <span className="meta small">{t(`nse.${n}` as MessageKey)}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+
       <div className="bind-line">
         <span className="meta">{t("scope.bindTo")}:</span> {network === undefined ? <span className="meta">…</span> : <NetworkLine n={network} />}
       </div>
@@ -260,7 +358,8 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
       </label>
       </div>
       <label className="confirm-line">
-        <input type="checkbox" checked={f.confirmed} onChange={(e) => setF({ ...f, confirmed: e.target.checked })} /> {t("scope.confirm")}
+        <input type="checkbox" checked={f.confirmed} onChange={(e) => setF({ ...f, confirmed: e.target.checked })} />{" "}
+        {t("scope.confirm").replace("{caps}", capsText(f.capabilities, t))}
       </label>
       <div className="form-actions">
         <button className="button-primary" type="submit" disabled={busy}>
