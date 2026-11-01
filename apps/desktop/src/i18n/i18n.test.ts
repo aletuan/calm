@@ -75,6 +75,10 @@ describe("i18n", () => {
     // Silence with a confirmed receiver is likely blocking, not proven blocking (inferred).
     expect(en["finding.reason.silent_confirmed_listener"]).toMatch(/likely/);
     expect(vi["finding.reason.silent_confirmed_listener"]).toMatch(/nhiều khả năng/);
+    // calm_bpf grants read AND write on /dev/bpf* (spike nmap-bpf, F5): the setup text must say it can also send.
+    expect(en["traffic.perm.note"]).toMatch(/send/);
+    expect(vi["traffic.perm.note"]).toMatch(/gửi/);
+    expect(en["traffic.perm.body"]).not.toMatch(/read access/);
     // Snapshots can be saved to a session, so capture consent must not promise "nothing on disk".
     expect(en["traffic.consent.memory"]).not.toMatch(/Nothing is written to disk/);
     expect(vi["traffic.consent.memory"]).not.toMatch(/Chưa ghi gì ra đĩa/);

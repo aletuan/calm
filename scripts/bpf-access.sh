@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Grants the current user read access to /dev/bpf* through the group `calm_bpf`,
-# so Calm can capture packet headers WITHOUT running as root (WP1 S2, ADR-005).
+# Grants the current user read AND write access to /dev/bpf* through the group
+# `calm_bpf`, so Calm can capture packet headers WITHOUT running as root
+# (WP1 S2, ADR-005). Write access also lets Nmap send raw packets (-sS, -O, ARP)
+# without root: see docs/spikes/nmap-bpf-findings.md.
 # Same approach as Wireshark's ChmodBPF. Needs an admin password once.
 #
 #   scripts/bpf-access.sh install     create group, add you, install boot-time daemon, apply now
@@ -8,7 +10,7 @@
 #   scripts/bpf-access.sh uninstall   remove daemon and group, restore root:wheel 600
 #
 # Security note: while installed, ANY process you run can read network traffic
-# on any interface. Uninstall when you no longer need capture. A narrower
+# and inject raw packets on any interface. Uninstall when you no longer need capture. A narrower
 # SMAppService helper is planned before a distributed release.
 set -euo pipefail
 
@@ -40,7 +42,7 @@ status() {
 install() {
   say "Creating group $GROUP (if missing) and adding $TARGET_USER"
   if ! dscl . -read "/Groups/$GROUP" >/dev/null 2>&1; then
-    sudo dseditgroup -o create -r "Calm packet capture (BPF read access)" "$GROUP"
+    sudo dseditgroup -o create -r "Calm packet capture (BPF read/write access)" "$GROUP"
   fi
   sudo dseditgroup -o edit -a "$TARGET_USER" -t user "$GROUP"
 
@@ -48,7 +50,7 @@ install() {
   sudo mkdir -p "$SUPPORT"
   sudo tee "$APPLY" >/dev/null <<EOF
 #!/bin/sh
-# Installed by Calm scripts/bpf-access.sh — re-applies BPF group read access.
+# Installed by Calm scripts/bpf-access.sh — re-applies BPF group read/write access.
 # /dev is rebuilt at boot and new BPF devices are cloned as root:wheel 600,
 # so this runs at load and every 5 minutes.
 /usr/bin/chgrp $GROUP /dev/bpf* 2>/dev/null

@@ -35,3 +35,6 @@ spikes/wp1/tauri-wifi/gen/
 
 # Coverage reports
 apps/desktop/coverage/
+
+# Nmap/BPF spike outputs (real addresses)
+spikes/nmap-bpf/results/
