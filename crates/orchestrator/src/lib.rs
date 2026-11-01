@@ -5,9 +5,11 @@
 //! denied. See [`scope`].
 
 pub mod checks;
+pub mod plan;
 pub mod probe;
 pub mod scope;
 
+pub use plan::{authorize_plan, valid_interface, PlanDenied, PlanGrant, RunPlan};
 pub use scope::{
     approve, authorize, binding_from_profile, check_address, in_subnet, same_network, Grant,
     ProbeRequest, ScopeDenied, ScopeDraft,

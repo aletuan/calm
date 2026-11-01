@@ -11,8 +11,8 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::Duration;
 
 use calm_domain::{
-    NetworkBinding, NetworkPosition, NetworkProfile, RateBudget, Scope, ScopeTarget, TargetRole,
-    TestLevel,
+    default_capabilities, Capability, NetworkBinding, NetworkPosition, NetworkProfile, RateBudget,
+    Scope, ScopeRange, ScopeTarget, TargetRole, TestLevel,
 };
 use serde::{Deserialize, Serialize};
 
@@ -26,6 +26,13 @@ pub const MAX_PROBES_PER_SECOND: u32 = 10;
 pub const DEFAULT_TIMEOUT_MS: u32 = 3000;
 pub const MIN_TIMEOUT_MS: u32 = 500;
 pub const MAX_TIMEOUT_MS: u32 = 5000;
+/// Largest range a scope may hold: a /24, 256 addresses (ADR-011).
+pub const MIN_RANGE_PREFIX: u32 = 24;
+/// NSE scripts Calm can run at all (ADR-011). Only from the `safe` and
+/// `default`/`discovery` categories; each must also be named in the scope.
+/// Never add a script from brute, dos, exploit, intrusive, malware, fuzzer,
+/// external or broadcast.
+pub const NSE_ALLOWLIST: [&str; 4] = ["http-headers", "http-title", "ssh-hostkey", "ssl-cert"];
 
 /// What the user filled in. Everything is re-validated here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -42,6 +49,44 @@ pub struct ScopeDraft {
     /// Where the Mac stands. Required: the user must say, even "unknown".
     #[serde(default)]
     pub vantage: Option<NetworkPosition>,
+    /// ADR-011. Drafts from before it mean TCP connect only.
+    #[serde(default = "default_capabilities")]
+    pub capabilities: Vec<Capability>,
+    #[serde(default)]
+    pub ranges: Vec<RangeDraft>,
+    #[serde(default)]
+    pub exclusions: Vec<String>,
+    #[serde(default)]
+    pub nse_scripts: Vec<String>,
+}
+
+impl Default for ScopeDraft {
+    /// An empty form. Capabilities start as TCP connect only, never empty.
+    fn default() -> Self {
+        Self {
+            authorization_reference: String::new(),
+            operator: String::new(),
+            granted_by: String::new(),
+            targets: vec![],
+            expires_at_ms: 0,
+            max_probes_per_second: DEFAULT_PROBES_PER_SECOND,
+            timeout_ms: DEFAULT_TIMEOUT_MS,
+            authorization_confirmed: false,
+            vantage: None,
+            capabilities: default_capabilities(),
+            ranges: vec![],
+            exclusions: vec![],
+            nse_scripts: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RangeDraft {
+    pub cidr: String,
+    pub ports: Vec<u16>,
+    #[serde(default)]
+    pub label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +148,29 @@ pub enum DraftError {
     NetworkUnknown,
     /// The user did not say which network the Mac is on.
     VantageRequired,
+    NoCapabilities,
+    /// Not a private IPv4 network address in CIDR form.
+    BadRange {
+        index: usize,
+    },
+    /// Wider than /24.
+    RangeTooLarge {
+        index: usize,
+    },
+    BadRangePorts {
+        index: usize,
+    },
+    /// Ranges without any excluded address: the owner must name what is off-limits.
+    ExclusionsRequired,
+    BadExclusion {
+        index: usize,
+    },
+    HostDiscoveryNeedsRange,
+    ScriptsNeedNse,
+    NseNeedsScripts,
+    ScriptNotAllowed {
+        index: usize,
+    },
 }
 
 /// Address policy for targets. Private IPv4 (RFC 1918), shared address space
@@ -255,7 +323,7 @@ pub fn approve(
     if draft.vantage.is_none() {
         errors.push(DraftError::VantageRequired);
     }
-    if draft.targets.is_empty() {
+    if draft.targets.is_empty() && draft.ranges.is_empty() {
         errors.push(DraftError::NoTargets);
     }
     if draft.targets.len() > MAX_TARGETS {
@@ -290,6 +358,10 @@ pub fn approve(
         }
     }
 
+    let capabilities = check_capabilities(draft, &mut errors);
+    let ranges = check_ranges(&draft.ranges, &mut errors);
+    let exclusions = check_exclusions(draft, &mut errors);
+
     if draft.expires_at_ms <= now_ms {
         errors.push(DraftError::ExpiryInPast);
     } else if draft.expires_at_ms - now_ms > MAX_VALIDITY_MS {
@@ -315,7 +387,11 @@ pub fn approve(
         operator: draft.operator.trim().to_owned(),
         granted_by: draft.granted_by.trim().to_owned(),
         targets,
-        max_level: TestLevel::L1,
+        max_level: capabilities
+            .iter()
+            .map(|c| c.level())
+            .max()
+            .unwrap_or(TestLevel::L1),
         budget: RateBudget {
             max_probes_per_second: draft.max_probes_per_second,
             timeout_ms: draft.timeout_ms,
@@ -325,7 +401,96 @@ pub fn approve(
         vantage: draft.vantage.unwrap_or_default(),
         approved_at_ms: now_ms,
         expires_at_ms: draft.expires_at_ms,
+        capabilities,
+        ranges,
+        exclusions,
+        nse_scripts: draft.nse_scripts.clone(),
     })
+}
+
+/// Sorted, deduplicated capabilities, plus the rules that tie them to the
+/// rest of the draft (ranges for discovery, scripts for NSE).
+fn check_capabilities(draft: &ScopeDraft, errors: &mut Vec<DraftError>) -> Vec<Capability> {
+    let mut caps = draft.capabilities.clone();
+    caps.sort_unstable();
+    caps.dedup();
+    if caps.is_empty() {
+        errors.push(DraftError::NoCapabilities);
+    }
+    if caps.contains(&Capability::HostDiscovery) && draft.ranges.is_empty() {
+        errors.push(DraftError::HostDiscoveryNeedsRange);
+    }
+    let nse = caps.contains(&Capability::Nse);
+    if !nse && !draft.nse_scripts.is_empty() {
+        errors.push(DraftError::ScriptsNeedNse);
+    }
+    if nse && draft.nse_scripts.is_empty() {
+        errors.push(DraftError::NseNeedsScripts);
+    }
+    for (index, name) in draft.nse_scripts.iter().enumerate() {
+        if !NSE_ALLOWLIST.contains(&name.as_str()) {
+            errors.push(DraftError::ScriptNotAllowed { index });
+        }
+    }
+    caps
+}
+
+/// A private IPv4 network address with a prefix of /24 or longer, in
+/// canonical form. Returns the network and its prefix.
+pub fn parse_range(cidr: &str) -> Option<(Ipv4Addr, u32)> {
+    let (net, prefix) = cidr.trim().split_once('/')?;
+    let net: Ipv4Addr = net.parse().ok()?;
+    let prefix: u32 = prefix.parse().ok().filter(|p| *p <= 32)?;
+    let mask = u32::MAX.checked_shl(32 - prefix).unwrap_or(0);
+    (u32::from(net) & mask == u32::from(net) && check_v4(net).is_ok()).then_some((net, prefix))
+}
+
+/// Is this address inside the range (as parsed by [`parse_range`])?
+pub fn range_contains(range: (Ipv4Addr, u32), ip: IpAddr) -> bool {
+    let IpAddr::V4(v4) = ip else { return false };
+    let mask = u32::MAX.checked_shl(32 - range.1).unwrap_or(0);
+    u32::from(v4) & mask == u32::from(range.0)
+}
+
+fn check_ranges(drafts: &[RangeDraft], errors: &mut Vec<DraftError>) -> Vec<ScopeRange> {
+    let mut out = Vec::new();
+    for (index, r) in drafts.iter().enumerate() {
+        let Some((net, prefix)) = parse_range(&r.cidr) else {
+            errors.push(DraftError::BadRange { index });
+            continue;
+        };
+        if prefix < MIN_RANGE_PREFIX {
+            errors.push(DraftError::RangeTooLarge { index });
+            continue;
+        }
+        let mut ports = r.ports.clone();
+        ports.sort_unstable();
+        ports.dedup();
+        if ports.is_empty() || ports.len() > MAX_PORTS_PER_TARGET || ports.contains(&0) {
+            errors.push(DraftError::BadRangePorts { index });
+            continue;
+        }
+        out.push(ScopeRange {
+            cidr: format!("{net}/{prefix}"),
+            ports,
+            label: r.label.trim().to_owned(),
+        });
+    }
+    out
+}
+
+fn check_exclusions(draft: &ScopeDraft, errors: &mut Vec<DraftError>) -> Vec<String> {
+    if !draft.ranges.is_empty() && draft.exclusions.is_empty() {
+        errors.push(DraftError::ExclusionsRequired);
+    }
+    let mut out = Vec::new();
+    for (index, e) in draft.exclusions.iter().enumerate() {
+        match e.trim().parse::<IpAddr>() {
+            Ok(ip) => out.push(ip.to_string()),
+            Err(_) => errors.push(DraftError::BadExclusion { index }),
+        }
+    }
+    out
 }
 
 /// One probe someone wants to send.
@@ -357,6 +522,8 @@ pub enum ScopeDenied {
     NetworkChanged,
     #[error("address not allowed as a target")]
     AddressNotAllowed,
+    #[error("the scope does not allow this kind of traffic")]
+    CapabilityNotGranted,
 }
 
 /// Permission for exactly one address:port, from one scope. Cannot be built
@@ -405,6 +572,10 @@ pub fn authorize(
     }
     if req.level > scope.max_level {
         return Err(ScopeDenied::LevelExceeded);
+    }
+    // Calm's own probe runner sends TCP connects only (ADR-011).
+    if !scope.allows(Capability::TcpConnect) {
+        return Err(ScopeDenied::CapabilityNotGranted);
     }
     // Defence in depth: even a stored scope is re-checked against the policy.
     if check_address(&req.address.to_string()).is_err() {
@@ -469,6 +640,7 @@ mod tests {
             timeout_ms: DEFAULT_TIMEOUT_MS,
             authorization_confirmed: true,
             vantage: Some(NetworkPosition::Guest),
+            ..Default::default()
         }
     }
 
@@ -489,7 +661,7 @@ mod tests {
         let s = scope();
         assert_eq!(s.targets[0].ports, vec![80, 443], "sorted, deduplicated");
         assert_eq!(s.targets[0].label, "router UI");
-        assert_eq!(s.max_level, TestLevel::L1, "M2 grants L1 only");
+        assert_eq!(s.max_level, TestLevel::L1, "TCP connect only is L1");
         assert_eq!(s.budget.max_parallel_targets, 1);
         assert_eq!(s.approved_at_ms, NOW);
         assert_eq!(s.network, net());
@@ -532,6 +704,7 @@ mod tests {
             timeout_ms: 100,
             authorization_confirmed: false,
             vantage: None,
+            ..Default::default()
         };
         let e = approve(&d, "x".into(), "s".into(), None, NOW).unwrap_err();
         for want in [
@@ -834,6 +1007,166 @@ mod tests {
             flags: vec![],
         }]);
         assert_eq!(binding_from_profile(&p).unwrap().subnet, None);
+    }
+
+    // ADR-011: capabilities, ranges, exclusions, NSE scripts.
+
+    #[test]
+    fn calms_own_tcp_connect_needs_the_tcp_connect_capability() {
+        let mut d = draft();
+        d.capabilities = vec![Capability::SynScan];
+        let s = approve(&d, "x".into(), "s".into(), Some(net()), NOW).unwrap();
+        assert_eq!(
+            authorize(
+                Some(&s),
+                false,
+                req("192.168.68.1", 443),
+                NOW + 1,
+                Some(&net())
+            ),
+            Err(ScopeDenied::CapabilityNotGranted)
+        );
+    }
+
+    fn range(cidr: &str, ports: Vec<u16>) -> RangeDraft {
+        RangeDraft {
+            cidr: cidr.into(),
+            ports,
+            label: String::new(),
+        }
+    }
+
+    fn approve_errs(d: &ScopeDraft) -> Vec<DraftError> {
+        approve(d, "x".into(), "s".into(), Some(net()), NOW).unwrap_err()
+    }
+
+    #[test]
+    fn a_draft_without_capabilities_is_tcp_connect_only_as_before() {
+        let s = scope();
+        assert_eq!(s.capabilities, vec![Capability::TcpConnect]);
+        assert_eq!(s.max_level, TestLevel::L1);
+        let old: ScopeDraft = serde_json::from_value(serde_json::json!({
+            "authorization_reference": "R", "operator": "A", "granted_by": "O",
+            "targets": [{"address": "192.168.68.1", "ports": [443], "role": "admin_interface"}],
+            "expires_at_ms": NOW + HOUR, "max_probes_per_second": 5, "timeout_ms": 3000,
+            "authorization_confirmed": true, "vantage": "guest"
+        }))
+        .unwrap();
+        assert_eq!(old.capabilities, vec![Capability::TcpConnect]);
+    }
+
+    #[test]
+    fn the_level_is_the_highest_capability_granted() {
+        let mut d = draft();
+        d.capabilities = vec![
+            Capability::TcpConnect,
+            Capability::SynScan,
+            Capability::TcpConnect,
+        ];
+        let s = approve(&d, "x".into(), "s".into(), Some(net()), NOW).unwrap();
+        assert_eq!(
+            s.capabilities,
+            vec![Capability::TcpConnect, Capability::SynScan],
+            "sorted, deduplicated"
+        );
+        assert_eq!(s.max_level, TestLevel::L2);
+    }
+
+    #[test]
+    fn a_scope_needs_at_least_one_capability() {
+        let mut d = draft();
+        d.capabilities = vec![];
+        assert_eq!(approve_errs(&d), vec![DraftError::NoCapabilities]);
+    }
+
+    #[test]
+    fn ranges_are_private_ipv4_blocks_of_at_most_256_hosts_and_need_exclusions() {
+        let mut d = draft();
+        d.ranges = vec![range("192.168.68.0/24", vec![22, 80])];
+        assert_eq!(approve_errs(&d), vec![DraftError::ExclusionsRequired]);
+        d.exclusions = vec!["192.168.68.50".into()];
+        let s = approve(&d, "x".into(), "s".into(), Some(net()), NOW).unwrap();
+        assert_eq!(s.ranges[0].cidr, "192.168.68.0/24");
+        assert_eq!(s.exclusions, vec!["192.168.68.50".to_string()]);
+
+        for (cidr, want) in [
+            ("192.168.68.0/23", DraftError::RangeTooLarge { index: 0 }),
+            ("8.8.8.0/24", DraftError::BadRange { index: 0 }),
+            ("192.168.68.7/24", DraftError::BadRange { index: 0 }), // not the network address
+            ("fd00::/120", DraftError::BadRange { index: 0 }),
+            ("192.168.68.0", DraftError::BadRange { index: 0 }),
+            ("192.168.68.0/33", DraftError::BadRange { index: 0 }),
+        ] {
+            d.ranges = vec![range(cidr, vec![80])];
+            assert_eq!(approve_errs(&d), vec![want], "{cidr}");
+        }
+        d.ranges = vec![range("192.168.68.0/24", vec![])];
+        assert_eq!(
+            approve_errs(&d),
+            vec![DraftError::BadRangePorts { index: 0 }]
+        );
+        d.ranges = vec![range("192.168.68.0/24", vec![0])];
+        assert_eq!(
+            approve_errs(&d),
+            vec![DraftError::BadRangePorts { index: 0 }]
+        );
+        d.ranges = vec![range("192.168.68.0/24", vec![80])];
+        d.exclusions = vec!["router".into()];
+        assert_eq!(
+            approve_errs(&d),
+            vec![DraftError::BadExclusion { index: 0 }]
+        );
+    }
+
+    #[test]
+    fn ranges_alone_are_enough_targets() {
+        let mut d = draft();
+        d.targets = vec![];
+        d.ranges = vec![range("10.20.0.0/28", vec![443])];
+        d.exclusions = vec!["10.20.0.1".into()];
+        assert!(approve(&d, "x".into(), "s".into(), Some(net()), NOW).is_ok());
+    }
+
+    #[test]
+    fn host_discovery_needs_a_range() {
+        let mut d = draft();
+        d.capabilities = vec![Capability::HostDiscovery];
+        assert_eq!(approve_errs(&d), vec![DraftError::HostDiscoveryNeedsRange]);
+    }
+
+    #[test]
+    fn nse_scripts_are_allowlisted_and_need_the_capability() {
+        let mut d = draft();
+        d.nse_scripts = vec!["http-title".into()];
+        assert_eq!(approve_errs(&d), vec![DraftError::ScriptsNeedNse]);
+        d.capabilities = vec![Capability::Nse];
+        assert!(approve(&d, "x".into(), "s".into(), Some(net()), NOW).is_ok());
+        d.nse_scripts = vec![];
+        assert_eq!(approve_errs(&d), vec![DraftError::NseNeedsScripts]);
+        for bad in [
+            "smb-brute",
+            "http-slowloris",
+            "vulners",
+            "http-title,ssh-brute",
+            "../x",
+        ] {
+            d.nse_scripts = vec![bad.into()];
+            assert_eq!(
+                approve_errs(&d),
+                vec![DraftError::ScriptNotAllowed { index: 0 }],
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_nse_allowlist_holds_only_safe_scripts() {
+        // Scripts from the categories ADR-011 forbids (brute, dos, exploit,
+        // intrusive, malware, fuzzer, external, broadcast) must never be added.
+        assert_eq!(
+            NSE_ALLOWLIST,
+            ["http-headers", "http-title", "ssh-hostkey", "ssl-cert"]
+        );
     }
 
     #[test]

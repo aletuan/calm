@@ -162,6 +162,7 @@ mod tests {
             timeout_ms: 3000,
             authorization_confirmed: true,
             vantage: Some(calm_domain::NetworkPosition::Guest),
+            ..Default::default()
         }
     }
 

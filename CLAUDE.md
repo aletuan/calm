@@ -9,10 +9,11 @@ Never trade these for speed or convenience.
 1. **Claim only what was observed or validated.** Everything else is `inferred`, `unverified`, `inconclusive` or `not_tested`. Silence is never a `pass` unless the user confirmed the listener was running (AT-07). A reachable port never means a login is possible (AT-08).
 2. **Passive by default; active only by scope.** Nothing leaves the Mac towards a target unless:
    - a scope was approved, is unexpired and unrevoked, and is bound to the current network;
-   - and `calm_orchestrator::authorize` allowed that exact address, port and level just before sending.
+   - and, for Calm's own probes, `calm_orchestrator::authorize` allowed that exact address, port and capability just before sending;
+   - or, for an Nmap run, `calm_orchestrator::authorize_plan` allowed the whole plan (every target, range, port, capability and script), and `calm_nmap` built the command from that `PlanGrant` alone (ADR-011).
 
-   Do not add another path that sends probes.
-3. **Deny by default.** New checks, adapters and plugins get a `Grant` from `authorize` or they do not run. Unknown network ⇒ deny. Store error ⇒ treat the scope as revoked.
+   These are the only two paths that send. Do not add a third. Never pass user-typed text to Nmap, and never run it as root.
+3. **Deny by default.** New checks, adapters and plugins get a `Grant` or `PlanGrant` from the scope engine or they do not run. A scope allows only the capabilities the owner ticked. Unknown network ⇒ deny. Store error ⇒ treat the scope as revoked.
 4. **Privacy.**
    - Capture headers only (snaplen 96) and keep them in memory.
    - Never store packet payloads or the imported file itself (store only its SHA-256).

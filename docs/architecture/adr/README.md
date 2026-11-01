@@ -12,7 +12,7 @@
 | [008](ADR-008-scaffold-conventions.md) | Codename Calm, bundle ID `com.aletuan.calm`, unified vocabulary | Accepted baseline |
 | [009](ADR-009-storage-encryption.md) | Session storage: per-session AES-256-GCM, Keychain master key, crypto-shredding | Accepted for alpha |
 | [010](ADR-010-scope-grants-and-probes.md) | Scope grants (literal private IPs, network-bound, immutable), per-probe authorization, TCP-connect L1 checks S01/N03/N01 | Accepted for beta |
-| [011](ADR-011-capability-scopes-and-nmap.md) | Capability scopes (ranges, exclusions, L1/L2 capabilities); Nmap runs authorized per plan, raw packets via calm_bpf, no root | Proposed |
+| [011](ADR-011-capability-scopes-and-nmap.md) | Capability scopes (ranges, exclusions, L1/L2 capabilities); Nmap runs authorized per plan, raw packets via calm_bpf, no root | Accepted for beta |
 | [012](ADR-012-nmap-bundling-and-license.md) | Bundle Nmap in Calm.app; release Calm under the NPSL 0.95 | Proposed |
 
 `Accepted baseline/principle` reflects decisions in this conversation; `Proposed` needs engineering spike or review before implementation.

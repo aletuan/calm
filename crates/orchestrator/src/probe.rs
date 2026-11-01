@@ -236,6 +236,7 @@ mod tests {
             timeout_ms: 1000,
             authorization_confirmed: true,
             vantage: Some(calm_domain::NetworkPosition::Guest),
+            ..Default::default()
         };
         approve(&d, "sc".into(), "s".into(), Some(net()), NOW).unwrap()
     }

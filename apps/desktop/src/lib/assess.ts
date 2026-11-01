@@ -25,6 +25,15 @@ export interface NetworkBinding {
   ssid: string | null;
 }
 
+/** ADR-011: kinds of traffic a scope allows. Mirrors `calm_domain::Capability`. */
+export type Capability = "tcp_connect" | "host_discovery" | "reverse_dns" | "syn_scan" | "service_detection" | "os_detection" | "nse";
+
+export interface ScopeRange {
+  cidr: string;
+  ports: number[];
+  label: string;
+}
+
 export interface Scope {
   id: string;
   session_id: string;
@@ -38,6 +47,11 @@ export interface Scope {
   vantage: NetworkPosition;
   approved_at_ms: number;
   expires_at_ms: number;
+  /** Scopes stored before ADR-011 read as ["tcp_connect"] on the Rust side. */
+  capabilities: Capability[];
+  ranges: ScopeRange[];
+  exclusions: string[];
+  nse_scripts: string[];
 }
 
 export interface ScopeView {
@@ -64,6 +78,11 @@ export interface ScopeDraft {
   authorization_confirmed: boolean;
   /** Required: null is rejected with `vantage_required`. */
   vantage: NetworkPosition | null;
+  /** ADR-011. Left out: TCP connect only, no ranges, no scripts. */
+  capabilities?: Capability[];
+  ranges?: { cidr: string; ports: number[]; label: string }[];
+  exclusions?: string[];
+  nse_scripts?: string[];
 }
 
 export type AddressReason = "not_an_address" | "unspecified" | "loopback" | "multicast" | "broadcast" | "link_local" | "not_private";
@@ -86,7 +105,17 @@ export type DraftError =
   | { kind: "rate_out_of_range" }
   | { kind: "timeout_out_of_range" }
   | { kind: "network_unknown" }
-  | { kind: "vantage_required" };
+  | { kind: "vantage_required" }
+  | { kind: "no_capabilities" }
+  | { kind: "bad_range"; index: number }
+  | { kind: "range_too_large"; index: number }
+  | { kind: "bad_range_ports"; index: number }
+  | { kind: "exclusions_required" }
+  | { kind: "bad_exclusion"; index: number }
+  | { kind: "host_discovery_needs_range" }
+  | { kind: "scripts_need_nse" }
+  | { kind: "nse_needs_scripts" }
+  | { kind: "script_not_allowed"; index: number };
 
 export type ScopeError =
   | { kind: "invalid"; detail: DraftError[] }
@@ -107,7 +136,8 @@ export type DenyReason =
   | "port_not_allowed"
   | "network_unknown"
   | "network_changed"
-  | "address_not_allowed";
+  | "address_not_allowed"
+  | "capability_not_granted";
 
 export type ProbeOutcome =
   | { kind: "connected"; rtt_ms: number }

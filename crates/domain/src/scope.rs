@@ -64,6 +64,76 @@ pub enum NetworkPosition {
     Unknown,
 }
 
+/// One kind of traffic the owner allows (ADR-011). Off unless listed in the
+/// scope. Each has a fixed level; what it sends beyond a TCP connect is part
+/// of what the owner approves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Capability {
+    /// One TCP connect per port, closed at once (ADR-010).
+    TcpConnect,
+    /// ARP or ping inside the scope's ranges.
+    HostDiscovery,
+    /// PTR lookups, only through the network's own private resolver.
+    ReverseDns,
+    /// Half-open TCP (`-sS`); raw packets through BPF.
+    SynScan,
+    /// Probe strings into open ports (`-sV`).
+    ServiceDetection,
+    /// Extra TCP, ICMP and one UDP probe to a closed port (`-O`).
+    OsDetection,
+    /// Allowlisted NSE scripts, named one by one in the scope.
+    Nse,
+}
+
+impl Capability {
+    pub const ALL: [Capability; 7] = [
+        Capability::TcpConnect,
+        Capability::HostDiscovery,
+        Capability::ReverseDns,
+        Capability::SynScan,
+        Capability::ServiceDetection,
+        Capability::OsDetection,
+        Capability::Nse,
+    ];
+
+    pub fn level(self) -> TestLevel {
+        match self {
+            Capability::TcpConnect | Capability::HostDiscovery | Capability::ReverseDns => {
+                TestLevel::L1
+            }
+            Capability::SynScan
+            | Capability::ServiceDetection
+            | Capability::OsDetection
+            | Capability::Nse => TestLevel::L2,
+        }
+    }
+
+    /// Needs raw packets (BPF write access through `calm_bpf`, spike nmap-bpf).
+    pub fn needs_raw_packets(self) -> bool {
+        matches!(
+            self,
+            Capability::HostDiscovery | Capability::SynScan | Capability::OsDetection
+        )
+    }
+}
+
+/// Capabilities of a scope stored before ADR-011: TCP connect only.
+pub fn default_capabilities() -> Vec<Capability> {
+    vec![Capability::TcpConnect]
+}
+
+/// A private IPv4 block the owner allows, with the ports allowed on every
+/// host in it. Hosts listed in the scope's exclusions are never touched.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScopeRange {
+    /// Canonical CIDR text, e.g. "192.168.10.0/24" (network address, prefix ≥ 24).
+    pub cidr: String,
+    pub ports: Vec<u16>,
+    #[serde(default)]
+    pub label: String,
+}
+
 /// An approved, immutable authorization grant. Enforcement: `calm-orchestrator`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Scope {
@@ -83,4 +153,61 @@ pub struct Scope {
     pub vantage: NetworkPosition,
     pub approved_at_ms: i64,
     pub expires_at_ms: i64,
+    /// What kinds of traffic are allowed. Older scopes: TCP connect only.
+    #[serde(default = "default_capabilities")]
+    pub capabilities: Vec<Capability>,
+    /// Private blocks allowed on top of the literal targets (ADR-011).
+    #[serde(default)]
+    pub ranges: Vec<ScopeRange>,
+    /// Addresses never touched, even inside a range. Required with ranges.
+    #[serde(default)]
+    pub exclusions: Vec<String>,
+    /// NSE scripts the owner allowed by name (needs `Capability::Nse`).
+    #[serde(default)]
+    pub nse_scripts: Vec<String>,
+}
+
+impl Scope {
+    pub fn allows(&self, c: Capability) -> bool {
+        self.capabilities.contains(&c)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_capability_has_the_level_adr_011_gives_it() {
+        use Capability::*;
+        for c in Capability::ALL {
+            let expected = match c {
+                TcpConnect | HostDiscovery | ReverseDns => TestLevel::L1,
+                SynScan | ServiceDetection | OsDetection | Nse => TestLevel::L2,
+            };
+            assert_eq!(c.level(), expected, "{c:?}");
+        }
+        assert!(
+            SynScan.needs_raw_packets()
+                && OsDetection.needs_raw_packets()
+                && HostDiscovery.needs_raw_packets()
+        );
+        assert!(!TcpConnect.needs_raw_packets() && !ServiceDetection.needs_raw_packets());
+    }
+
+    #[test]
+    fn a_scope_stored_before_capabilities_reads_as_tcp_connect_only() {
+        let old = r#"{
+          "id":"s1","session_id":"x","authorization_reference":"R","operator":"A","granted_by":"O",
+          "targets":[{"address":"192.168.1.1","ports":[443],"role":"admin_interface"}],
+          "max_level":"L1",
+          "budget":{"max_probes_per_second":5,"timeout_ms":3000,"max_parallel_targets":1},
+          "network":{"gateway":"192.168.1.1","subnet":null,"ssid":null},
+          "approved_at_ms":1,"expires_at_ms":2
+        }"#;
+        let s: Scope = serde_json::from_str(old).expect("older scope JSON must still read");
+        assert_eq!(s.capabilities, vec![Capability::TcpConnect]);
+        assert!(s.ranges.is_empty() && s.exclusions.is_empty() && s.nse_scripts.is_empty());
+        assert!(s.allows(Capability::TcpConnect) && !s.allows(Capability::SynScan));
+    }
 }

@@ -389,6 +389,7 @@ mod tests {
             timeout_ms: 1000,
             authorization_confirmed: true,
             vantage: Some(calm_domain::NetworkPosition::Guest),
+            ..Default::default()
         };
         let net = NetworkBinding {
             gateway: "192.168.68.1".into(),
@@ -869,6 +870,7 @@ mod run_tests {
             timeout_ms: 1000,
             authorization_confirmed: true,
             vantage: Some(calm_domain::NetworkPosition::Guest),
+            ..Default::default()
         };
         let scope = approve(&d, "sc".into(), "s".into(), Some(net.clone()), NOW).unwrap();
         let clock = Fake(Cell::new(NOW + 10));

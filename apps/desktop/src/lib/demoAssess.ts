@@ -228,6 +228,11 @@ export class DemoAssess {
       vantage: d.vantage ?? "unknown",
       approved_at_ms: now,
       expires_at_ms: d.expires_at_ms,
+      // The form has no capability choices yet (ADR-011): same as Rust's default.
+      capabilities: ["tcp_connect"],
+      ranges: [],
+      exclusions: [],
+      nse_scripts: [],
     };
     this.scopes.set(scope.id, { scope, revoked: false });
     return { scope, revoked: false, expired: false };

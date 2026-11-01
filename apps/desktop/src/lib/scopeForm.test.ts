@@ -54,4 +54,13 @@ describe("draft errors", () => {
     expect(draftErrorRow({ kind: "no_ports", index: 2 })).toBe(2);
     expect(draftErrorRow({ kind: "no_targets" })).toBeNull();
   });
+
+  it("only target errors belong to a target row; a range or exclusion index is another list", () => {
+    expect(draftErrorRow({ kind: "bad_address", index: 1, reason: "not_private" })).toBe(1);
+    expect(draftErrorRow({ kind: "bad_range", index: 0 })).toBeNull();
+    expect(draftErrorRow({ kind: "range_too_large", index: 0 })).toBeNull();
+    expect(draftErrorRow({ kind: "bad_range_ports", index: 0 })).toBeNull();
+    expect(draftErrorRow({ kind: "bad_exclusion", index: 0 })).toBeNull();
+    expect(draftErrorRow({ kind: "script_not_allowed", index: 0 })).toBeNull();
+  });
 });

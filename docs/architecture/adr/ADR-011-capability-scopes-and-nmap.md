@@ -1,6 +1,6 @@
 # ADR-011: Capability scopes and Nmap runs inside a grant
 
-**Status:** Proposed
+**Status:** Accepted for beta (2026-11-01)
 **Date:** 2026-11-01
 **Revises:** ADR-010 (scope grants and L1 probes), ADR-005 (privileges)
 **Related:** ADR-012 (bundling Nmap), spike `docs/spikes/nmap-bpf-findings.md`
@@ -68,7 +68,8 @@ UI text that describes what is sent is chosen from the enabled capabilities. "No
 - Import Nmap XML only: kept as an extra input; not enough for N04.
 
 ## Validation / revisit trigger
-- Unit tests for the command builder (every capability, every refusal), mutation-checked.
-- An out-of-scope suite with a fake `nmap` that records the arguments it receives.
+- Implemented (first step, 2026-11-01): `calm_domain::Capability` and the new `Scope` fields (older scopes read as TCP connect only); `approve` rules for capabilities, ranges, exclusions and scripts; `calm_orchestrator::authorize_plan` and `PlanGrant`; `authorize` now requires `tcp_connect`; crate `calm-nmap` (`build_args`, `runner::run` with process-group stop).
+- Tests: `orchestrator::plan` (11), new `scope` rules (9), `calm-nmap` command and runner (9), and the out-of-scope suite: all 128 capability subsets × 9 plan shapes, run against a fake `nmap`, arguments checked by rules independent of the builder. Mutation-checked: dropping `-n`, `-Pn`, `--exclude`, adding `-O`, using `--send-ip`, killing only the Nmap process, and removing each `authorize_plan` rule all fail a test.
+- Next: scope form for capabilities, ranges and exclusions; Nmap XML into findings; bundling (ADR-012).
 - Spikes still open: targets outside the subnet with `--send-eth`, IPv6, repeat of the connect-vs-SYN discrepancy (spike F6).
 - Revisit when plugins (M4) need grants.

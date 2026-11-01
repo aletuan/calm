@@ -690,6 +690,17 @@ export const en = {
   "finding.todo.denied": "Check that the scope is active and covers this target and port, then run again.",
   "finding.todo.stopped": "Start a new run when you are ready.",
   "finding.todo.no_target": "Add a target with this check's role to the scope, then run again.",
+  "scope.err.no_capabilities": "Choose at least one kind of test.",
+  "scope.err.bad_range": "Enter a private IPv4 block by its network address, such as 192.168.1.0/24.",
+  "scope.err.range_too_large": "Use a block of at most 256 addresses, /24 or smaller.",
+  "scope.err.bad_range_ports": "Enter 1 to 16 ports for the range, each from 1 to 65535.",
+  "scope.err.exclusions_required": "Name at least one address the tests must never touch, such as a production till.",
+  "scope.err.bad_exclusion": "Enter each excluded address as one IP address.",
+  "scope.err.host_discovery_needs_range": "Add a range to use host discovery.",
+  "scope.err.scripts_need_nse": "Turn on NSE scripts, or remove the scripts listed.",
+  "scope.err.nse_needs_scripts": "Choose at least one script, or turn NSE off.",
+  "scope.err.script_not_allowed": "Choose scripts from the list Calm allows.",
+  "probe.denied.capability_not_granted": "kind of test not allowed",
 } as const;
 
 export type MessageKey = keyof typeof en;

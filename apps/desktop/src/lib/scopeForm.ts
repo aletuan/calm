@@ -95,9 +95,12 @@ export function draftErrorKey(e: DraftError): MessageKey {
   return `scope.err.${e.kind}` as MessageKey;
 }
 
+/** Errors whose index is a target row. Range, exclusion and script errors index other lists. */
+const TARGET_ROW_ERRORS: DraftError["kind"][] = ["bad_address", "duplicate_address", "no_ports", "too_many_ports", "bad_port"];
+
 /** Which target row an error belongs to, if any. */
 export function draftErrorRow(e: DraftError): number | null {
-  return "index" in e ? e.index : null;
+  return "index" in e && TARGET_ROW_ERRORS.includes(e.kind) ? e.index : null;
 }
 
 export const DRAFT_ERROR_KINDS: DraftError["kind"][] = [
@@ -118,4 +121,14 @@ export const DRAFT_ERROR_KINDS: DraftError["kind"][] = [
   "timeout_out_of_range",
   "network_unknown",
   "vantage_required",
+  "no_capabilities",
+  "bad_range",
+  "range_too_large",
+  "bad_range_ports",
+  "exclusions_required",
+  "bad_exclusion",
+  "host_discovery_needs_range",
+  "scripts_need_nse",
+  "nse_needs_scripts",
+  "script_not_allowed",
 ];
