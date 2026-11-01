@@ -1,0 +1,22 @@
+# Fictional/documentation-only IPs. No live testing permitted by this example.
+assessment:
+  name: demo-guest-audit
+  mode: authorized-blackbox
+  interface: en0
+scope:
+  authorization_reference: REQUIRED_BEFORE_ACTIVE_TESTS
+  allowed_targets: [192.0.2.10, 192.0.2.20]
+  allow_scope_expansion: false
+  expires_at: '2026-12-01T00:00:00+07:00'
+safety:
+  passive_default: true
+  active_scanning_requires_approval: true
+  max_probes_per_second: 5
+  max_parallel_targets: 1
+  timeout_seconds: 3
+  kill_switch: true
+checks:
+  wireless_profile: true
+  local_traffic_observation: true
+  approved_connectivity: false # enable only after signed scope review
+  cooperative_client_isolation: false

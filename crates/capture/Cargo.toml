@@ -1,0 +1,19 @@
+[package]
+name = "calm-capture"
+description = "Local packet capture via libpcap/BPF: headers only (snaplen 96), memory-only flow aggregation."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+calm-flow-engine.workspace = true
+serde.workspace = true
+pcap = "2"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Merged into the bundle's Info.plist by the Tauri CLI. -->
+<plist version="1.0"><dict>
+  <key>NSLocationUsageDescription</key>
+  <string>Calm needs Location access because macOS only reveals the connected Wi-Fi network name (SSID) and access point (BSSID) to apps with this permission. Calm does not read or store your location.</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>Calm needs Location access because macOS only reveals the connected Wi-Fi network name (SSID) and access point (BSSID) to apps with this permission. Calm does not read or store your location.</string>
+</dict></plist>

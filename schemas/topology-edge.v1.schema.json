@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://calm.aletuan.com/schemas/topology-edge.v1.schema.json",
+  "title": "Calm TopologyEdge",
+  "type": "object",
+  "required": ["source", "target", "relation_type", "epistemic_status", "confidence", "evidence_ids"],
+  "properties": {
+    "source": { "type": "string" },
+    "target": { "type": "string" },
+    "relation_type": { "$ref": "common.v1.schema.json#/$defs/relationType" },
+    "epistemic_status": { "$ref": "common.v1.schema.json#/$defs/epistemicStatus" },
+    "confidence": { "$ref": "common.v1.schema.json#/$defs/confidence" },
+    "evidence_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+  },
+  "additionalProperties": false
+}

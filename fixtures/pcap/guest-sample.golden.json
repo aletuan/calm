@@ -1,0 +1,391 @@
+{
+  "bindings": [
+    [
+      "192.0.2.1",
+      "02:ca:1d:00:00:01",
+      2
+    ],
+    [
+      "192.0.2.100",
+      "02:ca:1d:00:01:00",
+      2
+    ],
+    [
+      "192.0.2.105",
+      "02:ca:1d:00:01:05",
+      5
+    ],
+    [
+      "192.0.2.107",
+      "02:ca:1d:00:01:07",
+      2
+    ],
+    [
+      "192.0.2.108",
+      "02:ca:1d:00:01:08",
+      50
+    ],
+    [
+      "198.51.100.53",
+      "02:ca:1d:00:00:01",
+      4
+    ],
+    [
+      "203.0.113.10",
+      "02:ca:1d:00:00:01",
+      21
+    ],
+    [
+      "203.0.113.11",
+      "02:ca:1d:00:00:01",
+      6
+    ],
+    [
+      "203.0.113.20",
+      "02:ca:1d:00:00:01",
+      10
+    ],
+    [
+      "2001:db8:1::108",
+      "02:ca:1d:00:01:08",
+      1
+    ],
+    [
+      "2001:db8:ffff::443",
+      "02:ca:1d:00:00:01",
+      5
+    ],
+    [
+      "fe80::1",
+      "02:ca:1d:00:00:01",
+      1
+    ],
+    [
+      "fe80::a",
+      "02:ca:1d:00:01:00",
+      1
+    ],
+    [
+      "fe80::d",
+      "02:ca:1d:00:0d:0d",
+      1
+    ],
+    [
+      "fe80::108",
+      "02:ca:1d:00:01:08",
+      1
+    ]
+  ],
+  "error": null,
+  "ethernet_frames": 113,
+  "first_ts_ms": 1793437200000,
+  "flows": [
+    {
+      "bytes": [
+        0,
+        42
+      ],
+      "direction": "heard",
+      "first_seen_ms": 1793437230000,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437230000,
+      "local": "192.0.2.1",
+      "packets": [
+        0,
+        1
+      ],
+      "remote": "192.0.2.107",
+      "transport": "arp"
+    },
+    {
+      "bytes": [
+        42,
+        42
+      ],
+      "direction": "outbound",
+      "first_seen_ms": 1793437200000,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437200002,
+      "local": "192.0.2.108",
+      "packets": [
+        1,
+        1
+      ],
+      "remote": "192.0.2.1",
+      "transport": "arp"
+    },
+    {
+      "bytes": [
+        98,
+        98
+      ],
+      "direction": "outbound",
+      "first_seen_ms": 1793437210000,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437210004,
+      "local": "192.0.2.108",
+      "packets": [
+        1,
+        1
+      ],
+      "remote": "192.0.2.1",
+      "transport": "icmp"
+    },
+    {
+      "bytes": [
+        0,
+        110
+      ],
+      "direction": "heard",
+      "first_seen_ms": 1793437200005,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437200005,
+      "local": "ff02::1",
+      "packets": [
+        0,
+        1
+      ],
+      "remote": "fe80::1",
+      "transport": "icmpv6"
+    },
+    {
+      "bytes": [
+        1070,
+        630
+      ],
+      "direction": "inbound",
+      "first_seen_ms": 1793437220000,
+      "initiated_by": "remote",
+      "last_seen_ms": 1793437220450,
+      "local": "192.0.2.108:22",
+      "packets": [
+        5,
+        5
+      ],
+      "remote": "192.0.2.105:51515",
+      "transport": "tcp"
+    },
+    {
+      "bytes": [
+        1188,
+        29134
+      ],
+      "direction": "outbound",
+      "first_seen_ms": 1793437202000,
+      "initiated_by": "local",
+      "last_seen_ms": 1793437211620,
+      "local": "192.0.2.108:50100",
+      "packets": [
+        22,
+        21
+      ],
+      "remote": "203.0.113.10:443",
+      "transport": "tcp"
+    },
+    {
+      "bytes": [
+        324,
+        3924
+      ],
+      "direction": "inbound",
+      "first_seen_ms": 1793437203000,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437208010,
+      "local": "192.0.2.108:50200",
+      "packets": [
+        6,
+        6
+      ],
+      "remote": "203.0.113.11:443",
+      "transport": "tcp"
+    },
+    {
+      "bytes": [
+        54,
+        408
+      ],
+      "direction": "outbound",
+      "first_seen_ms": 1793437215000,
+      "initiated_by": "local",
+      "last_seen_ms": 1793437215200,
+      "local": "192.0.2.108:50400",
+      "packets": [
+        1,
+        2
+      ],
+      "remote": "192.0.2.100:8009",
+      "transport": "tcp"
+    },
+    {
+      "bytes": [
+        74,
+        6370
+      ],
+      "direction": "outbound",
+      "first_seen_ms": 1793437208000,
+      "initiated_by": "local",
+      "last_seen_ms": 1793437208900,
+      "local": "2001:db8:1::108:50300",
+      "packets": [
+        1,
+        5
+      ],
+      "remote": "2001:db8:ffff::443:443",
+      "transport": "tcp"
+    },
+    {
+      "bytes": [
+        12420,
+        12920
+      ],
+      "direction": "outbound",
+      "first_seen_ms": 1793437204000,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437206750,
+      "local": "192.0.2.108:51000",
+      "packets": [
+        10,
+        10
+      ],
+      "remote": "203.0.113.20:443",
+      "transport": "udp"
+    },
+    {
+      "bytes": [
+        82,
+        162
+      ],
+      "direction": "outbound",
+      "first_seen_ms": 1793437201000,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437201025,
+      "local": "192.0.2.108:53000",
+      "packets": [
+        1,
+        1
+      ],
+      "remote": "198.51.100.53:53",
+      "transport": "udp"
+    },
+    {
+      "bytes": [
+        82,
+        162
+      ],
+      "direction": "outbound",
+      "first_seen_ms": 1793437201400,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437201425,
+      "local": "192.0.2.108:53001",
+      "packets": [
+        1,
+        1
+      ],
+      "remote": "198.51.100.53:53",
+      "transport": "udp"
+    },
+    {
+      "bytes": [
+        82,
+        162
+      ],
+      "direction": "outbound",
+      "first_seen_ms": 1793437201800,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437201825,
+      "local": "192.0.2.108:53002",
+      "packets": [
+        1,
+        1
+      ],
+      "remote": "198.51.100.53:53",
+      "transport": "udp"
+    },
+    {
+      "bytes": [
+        82,
+        162
+      ],
+      "direction": "outbound",
+      "first_seen_ms": 1793437259000,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437259030,
+      "local": "192.0.2.108:53010",
+      "packets": [
+        1,
+        1
+      ],
+      "remote": "198.51.100.53:53",
+      "transport": "udp"
+    },
+    {
+      "bytes": [
+        0,
+        202
+      ],
+      "direction": "heard",
+      "first_seen_ms": 1793437230500,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437230500,
+      "local": "224.0.0.251:5353",
+      "packets": [
+        0,
+        1
+      ],
+      "remote": "192.0.2.107:5353",
+      "transport": "udp"
+    },
+    {
+      "bytes": [
+        142,
+        142
+      ],
+      "direction": "inbound",
+      "first_seen_ms": 1793437216000,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437216010,
+      "local": "fe80::108:5353",
+      "packets": [
+        1,
+        1
+      ],
+      "remote": "fe80::a:5353",
+      "transport": "udp"
+    },
+    {
+      "bytes": [
+        0,
+        202
+      ],
+      "direction": "heard",
+      "first_seen_ms": 1793437240000,
+      "initiated_by": "unknown",
+      "last_seen_ms": 1793437240000,
+      "local": "ff02::fb:5353",
+      "packets": [
+        0,
+        1
+      ],
+      "remote": "fe80::d:5353",
+      "transport": "udp"
+    }
+  ],
+  "format": "pcapng",
+  "frames": 113,
+  "last_ts_ms": 1793437259030,
+  "series_seconds": 18,
+  "total_bytes": 70612,
+  "total_packets": 112,
+  "unparsed_frames": 1,
+  "unsupported_link_frames": 0,
+  "vantage": {
+    "addresses": [
+      "192.0.2.108",
+      "2001:db8:1::108",
+      "fe80::108"
+    ],
+    "involved_frames": 108,
+    "mac": "02:ca:1d:00:01:08",
+    "unicast_frames": 112
+  }
+}

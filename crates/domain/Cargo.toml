@@ -1,0 +1,17 @@
+[package]
+name = "calm-domain"
+description = "Canonical domain model for Calm: sessions, scope, evidence, assets, flows, findings and graph semantics."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+time.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

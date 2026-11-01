@@ -1,0 +1,26 @@
+# Calm extension manifest (draft). Not an existing third-party format.
+apiVersion: calm.aletuan.com/v1alpha1
+kind: Extension
+metadata:
+  id: com.aletuan.calm.ext.nmap-adapter
+  name: Nmap XML Adapter
+  version: 0.0.0
+spec:
+  protocol: jsonrpc-2.0
+  runtime:
+    type: subprocess
+    platform: [darwin-arm64]
+    executable: bin/adapter
+  capabilities: [asset.discovery, service.discovery]
+  permissions:
+    network: scoped_targets_only
+    filesystem: temporary_output_only
+    elevated: false
+  safety:
+    tier: L1
+    requires_authorization: true
+    max_probes_per_second: 5
+    timeout_seconds: 60
+  nativeFormat: nmap-xml
+  normalizedFormat: calm-assets-v1alpha1
+  publisherSignature: REQUIRED_AT_INSTALL

@@ -1,0 +1,85 @@
+/*
+ * Calm Technical UI — design tokens (docs/design/01-calm-technical-ui-guidelines.md §2–3).
+ * Proposed baseline: final foreground/background pairs still need WCAG 2.2 AA checks.
+ * Rule: ~90% neutral area; semantic colors only for real state, never decoration.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --color-bg-canvas: #14191e;
+  --color-bg-surface: #20272d;
+  --color-bg-elevated: #2c353d;
+
+  /* Text */
+  --color-text-primary: #e5e9e8;
+  --color-text-secondary: #929ea3;
+
+  /* Accent: selection + principal action only */
+  --color-accent-primary: #82a6af;
+
+  /* Semantic: severity/state only */
+  --color-semantic-warning: #d2a66b;
+  --color-semantic-critical: #cb7775;
+  --color-semantic-success: #79a995;
+
+  /* Neutral strokes (derived, low opacity) */
+  --color-divider: rgb(229 233 232 / 0.08);
+  --color-stroke: rgb(229 233 232 / 0.16);
+  --color-focus: rgb(130 166 175 / 0.7);
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --text-heading: 24px;
+  --text-section: 17px;
+  --text-body: 14px;
+  --text-meta: 12.5px;
+
+  /* 8px grid */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /*
+   * Spacing roles. Components use these, never raw pixel values:
+   *   tight   title → its subtitle, label → control, control → its hint
+   *   related items of one group (chips in a toolbar, target rows, list items)
+   *   field   between fields or lines of one form
+   *   block   between blocks of a section (text → table, actions → next block)
+   *   section between sections / numbered steps
+   */
+  --gap-tight: var(--space-1);
+  --gap-related: var(--space-2);
+  --gap-field: var(--space-3);
+  --gap-block: var(--space-4);
+  --gap-section: var(--space-8);
+  /* One height for every text field, select and primary button; chips are the small size. */
+  --control-height: 32px;
+  --control-height-sm: 28px;
+
+  /* Density: Comfortable default */
+  --row-height: 42px;
+  --radius: 6px;
+  --sidebar-width: 220px;
+  --titlebar-inset: 28px; /* room for macOS traffic lights (titleBarStyle: Overlay) */
+}
+
+:root[data-density="compact"] {
+  --row-height: 34px;
+  --control-height: 28px;
+  --control-height-sm: 24px;
+  --gap-section: var(--space-6);
+  --space-5: 16px;
+  --space-6: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0s;
+  }
+}

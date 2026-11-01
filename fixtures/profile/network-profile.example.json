@@ -1,0 +1,153 @@
+{
+  "schema_version": "calm-v1alpha1",
+  "observed_at": "2026-10-31T09:00:00Z",
+  "location_authorization": "authorized",
+  "bundled_app": true,
+  "wifi": {
+    "interface": {
+      "value": "en0",
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "ssid": {
+      "value": "GuestNet-Example",
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "bssid": {
+      "value": "02:ca:1d:aa:00:01",
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "channel": {
+      "value": 36,
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "band": {
+      "value": "5 GHz",
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "channel_width": {
+      "value": "80 MHz",
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "rssi_dbm": {
+      "value": -61,
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "noise_dbm": {
+      "value": -92,
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "security": {
+      "value": "WPA2 Personal",
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "phy_mode": {
+      "value": "802.11ax",
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "tx_rate_mbps": {
+      "value": 573.0,
+      "source": "corewlan",
+      "status": "observed",
+      "note": null
+    },
+    "country_code": {
+      "value": null,
+      "source": "corewlan",
+      "status": "unverified",
+      "note": "not_reported"
+    }
+  },
+  "hardware_address": {
+    "value": "02:ca:1d:00:01:08",
+    "source": "ifconfig en0",
+    "status": "observed",
+    "note": null
+  },
+  "hardware_address_private": {
+    "value": true,
+    "source": "IEEE 802 U/L bit",
+    "status": "inferred",
+    "note": "locally_administered"
+  },
+  "ipv4": {
+    "value": [
+      {
+        "address": "192.0.2.108",
+        "prefix": 24,
+        "flags": []
+      }
+    ],
+    "source": "ifconfig en0",
+    "status": "observed",
+    "note": null
+  },
+  "ipv6": {
+    "value": [
+      {
+        "address": "fe80::108",
+        "prefix": 64,
+        "flags": [
+          "secured"
+        ]
+      },
+      {
+        "address": "2001:db8:1::108",
+        "prefix": 64,
+        "flags": [
+          "autoconf",
+          "secured"
+        ]
+      }
+    ],
+    "source": "ifconfig en0",
+    "status": "observed",
+    "note": null
+  },
+  "ipv6_scope": {
+    "value": "global",
+    "source": "ifconfig en0",
+    "status": "observed",
+    "note": null
+  },
+  "default_gateway": {
+    "value": "192.0.2.1",
+    "source": "route -n get default",
+    "status": "observed",
+    "note": null
+  },
+  "default_route_interface": {
+    "value": "en0",
+    "source": "route -n get default",
+    "status": "observed",
+    "note": null
+  },
+  "dns_servers": {
+    "value": [
+      "198.51.100.53",
+      "192.0.2.1"
+    ],
+    "source": "scutil --dns",
+    "status": "observed",
+    "note": null
+  }
+}

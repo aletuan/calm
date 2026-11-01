@@ -1,0 +1,54 @@
+[workspace]
+resolver = "2"
+members = [
+  "apps/desktop/src-tauri",
+  "crates/domain",
+  "crates/orchestrator",
+  "crates/graph-engine",
+  "crates/flow-engine",
+  "crates/extension-sdk",
+  "crates/reporting",
+  "crates/net-profile",
+  "crates/capture",
+  "crates/store",
+  "native/capture-helper",
+]
+# Throwaway spikes have their own Cargo workspaces.
+exclude = ["spikes"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "UNLICENSED"
+publish = false
+authors = ["Andy Le <anhlt1983@gmail.com>"]
+
+[workspace.dependencies]
+calm-domain = { path = "crates/domain" }
+calm-orchestrator = { path = "crates/orchestrator" }
+calm-graph-engine = { path = "crates/graph-engine" }
+calm-flow-engine = { path = "crates/flow-engine" }
+calm-extension-sdk = { path = "crates/extension-sdk" }
+calm-reporting = { path = "crates/reporting" }
+calm-net-profile = { path = "crates/net-profile" }
+calm-capture = { path = "crates/capture" }
+calm-store = { path = "crates/store" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tracing = "0.1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

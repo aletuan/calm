@@ -1,0 +1,15 @@
+[package]
+name = "calm-reporting"
+description = "Report and export: Markdown/HTML/PDF, canonical JSON, SARIF, GraphML."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+calm-domain.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

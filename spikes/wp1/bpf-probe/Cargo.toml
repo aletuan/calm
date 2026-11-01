@@ -1,0 +1,12 @@
+[package]
+name = "bpf-probe"
+version = "0.0.1"
+edition = "2021"
+publish = false
+description = "WP1 spike: can this process open BPF, and how many packets/s does a headers-only capture sustain?"
+
+# Standalone: not part of the Calm workspace.
+[workspace]
+
+[dependencies]
+pcap = "2"

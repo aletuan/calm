@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://calm.aletuan.com/schemas/finding.v1.schema.json",
+  "title": "Calm Finding",
+  "type": "object",
+  "required": [
+    "schema_version", "session_id", "finding_id", "status", "title", "severity",
+    "confidence", "vantage", "verified_claims", "unverified_claims", "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "session_id": { "type": "string" },
+    "finding_id": { "type": "string" },
+    "status": { "$ref": "common.v1.schema.json#/$defs/findingStatus" },
+    "title": { "type": "string" },
+    "severity": { "$ref": "common.v1.schema.json#/$defs/severity" },
+    "confidence": { "$ref": "common.v1.schema.json#/$defs/confidence" },
+    "vantage": { "$ref": "common.v1.schema.json#/$defs/vantage" },
+    "tested_target": { "type": ["string", "null"] },
+    "verified_claims": { "type": "array", "items": { "type": "string" } },
+    "unverified_claims": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "scope_id": { "type": ["string", "null"] },
+    "recommendation": { "type": ["string", "null"] },
+    "example_only": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,22 @@
+[package]
+name = "calm-wifi-spike"
+version = "0.0.1"
+edition = "2021"
+publish = false
+description = "WP1 S1b: can a Tauri app read SSID/BSSID in its own Rust process after requesting Location?"
+
+# Standalone, not part of the Calm workspace.
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde_json = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString"] }
+objc2-core-location = { version = "0.3", features = ["CLLocationManager"] }
+objc2-core-wlan = { version = "0.3", features = ["CWWiFiClient", "CWInterface"] }

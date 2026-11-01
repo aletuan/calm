@@ -1,0 +1,18 @@
+[package]
+name = "calm-flow-engine"
+description = "Packet header parsing and flow aggregation (local vantage only). Untrusted input; never panics."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+etherparse = "0.18"
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

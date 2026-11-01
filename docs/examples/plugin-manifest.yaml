@@ -1,0 +1,28 @@
+# Illustrative proposed plugin contract; NOT existing third-party format.
+apiVersion: auditor.dev/v1alpha1
+kind: Extension
+metadata:
+  id: org.example.nmap-adapter
+  name: Nmap XML Adapter
+  version: 0.1.0
+spec:
+  protocol: jsonrpc-2.0
+  runtime:
+    type: subprocess
+    platform: [darwin-arm64, darwin-amd64]
+    executable: bin/adapter
+  capabilities: [asset.discovery, service.discovery]
+  permissions:
+    network: scoped_targets_only
+    filesystem: temporary_output_only
+    elevated: false
+  safety:
+    tier: L1
+    requires_authorization: true
+    max_probes_per_second: 5
+    timeout_seconds: 60
+  inputSchema: schemas/discovery-request.v1.json
+  outputSchema: schemas/discovery-response.v1.json
+  nativeFormat: nmap-xml
+  normalizedFormat: auditor-assets-v1
+  publisherSignature: REQUIRED_AT_INSTALL

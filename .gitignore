@@ -1,0 +1,37 @@
+# Rust
+/target/
+**/target/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# Swift
+native/macos-bridge/.build/
+native/macos-bridge/.swiftpm/
+*.xcodeproj/xcuserdata/
+
+# macOS
+.DS_Store
+
+# Local data — never commit real captures or sessions
+*.pcap
+*.pcapng
+!fixtures/**/*.pcap
+!fixtures/**/*.pcapng
+*.sqlite
+*.sqlite-*
+.env
+.env.*
+apps/desktop/src-tauri/gen/
+
+# WP1 spike outputs (may contain network identifiers even when masked)
+spikes/wp1/build/
+spikes/wp1/results/
+spikes/wp1/wifi-probe/.build/
+spikes/wp1/tauri-wifi/gen/
+
+# Coverage reports
+apps/desktop/coverage/

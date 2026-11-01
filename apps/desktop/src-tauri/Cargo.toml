@@ -1,0 +1,32 @@
+[package]
+name = "calm-desktop"
+description = "Calm macOS desktop shell (Tauri 2). No elevated privileges in this process (NFR-01)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "calm_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+sha2 = "0.10"
+serde.workspace = true
+serde_json.workspace = true
+calm-domain.workspace = true
+calm-orchestrator.workspace = true
+calm-graph-engine.workspace = true
+calm-net-profile.workspace = true
+calm-capture.workspace = true
+calm-flow-engine.workspace = true
+calm-store.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

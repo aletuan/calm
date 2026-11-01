@@ -1,0 +1,26 @@
+{
+  "name": "calm",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @calm/desktop tauri dev",
+    "dev:bundle": "bash scripts/dev-bundle.sh",
+    "bpf:install": "bash scripts/bpf-access.sh install",
+    "bpf:status": "bash scripts/bpf-access.sh status",
+    "bpf:uninstall": "bash scripts/bpf-access.sh uninstall",
+    "build": "pnpm --filter @calm/desktop tauri build",
+    "web:dev": "pnpm --filter @calm/desktop dev",
+    "typecheck": "pnpm -r typecheck",
+    "check": "pnpm typecheck && pnpm -r test && cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
+    "test": "pnpm -r test && cargo test --workspace",
+    "coverage": "pnpm --filter @calm/desktop coverage && bash scripts/coverage.sh"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+[package]
+name = "calm-graph-engine"
+description = "Evidence-backed asset graph: observed vs inferred edges, provenance."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+calm-domain.workspace = true
+calm-flow-engine.workspace = true
+serde.workspace = true
+time.workspace = true
+
+[lints]
+workspace = true

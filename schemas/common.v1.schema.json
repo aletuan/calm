@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://calm.aletuan.com/schemas/common.v1.schema.json",
+  "title": "Calm shared vocabularies",
+  "$comment": "Mirror of crates/domain/src/semantics.rs. Status, severity, confidence and epistemic status are orthogonal.",
+  "$defs": {
+    "findingStatus": { "enum": ["pass", "fail", "warning", "inconclusive", "not_tested", "informational"] },
+    "severity": { "enum": ["info", "low", "medium", "high", "critical"] },
+    "confidence": { "enum": ["low", "medium", "high"] },
+    "epistemicStatus": { "enum": ["observed", "validated", "inferred", "unverified"] },
+    "relationType": {
+      "enum": [
+        "ASSOCIATED_WITH",
+        "DEFAULT_ROUTE_VIA",
+        "RESOLVES_VIA",
+        "CONNECTIVITY_CONFIRMED",
+        "FLOW_OBSERVED",
+        "POSSIBLE_MEMBERSHIP",
+        "AFFECTED_BY"
+      ]
+    },
+    "vulnEvidenceState": { "enum": ["candidate", "likely_affected", "verified_vulnerable", "exploit_validated"] },
+    "testLevel": { "enum": ["L0", "L1", "L2", "L3"] },
+    "provenance": {
+      "enum": ["observed_by_mac", "authorized_test", "imported_sensor", "imported_scan", "intel_feed", "user_assertion"]
+    },
+    "vantage": { "enum": ["guest_wifi_laptop"] }
+  }
+}

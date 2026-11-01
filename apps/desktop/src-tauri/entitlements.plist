@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Hardened runtime entitlements. Location is required to read SSID/BSSID (ADR-008, WP1 S1b). -->
+<plist version="1.0"><dict>
+  <key>com.apple.security.personal-information.location</key><true/>
+</dict></plist>

@@ -1,0 +1,26 @@
+[package]
+name = "calm-net-profile"
+description = "Collects the network profile seen from this Mac: Wi-Fi (CoreWLAN, in-process per ADR-008), IP, route, DNS."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+calm-domain.workspace = true
+time.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString"] }
+objc2-core-location = { version = "0.3", features = ["CLLocationManager"] }
+objc2-core-wlan = { version = "0.3", features = ["CWWiFiClient", "CWInterface", "CWChannel", "CoreWLANTypes"] }
+
+# objc2 calls need `unsafe`; the workspace forbids it, so this crate opts out
+# and keeps all unsafe code inside src/macos.rs.
+[lints.rust]
+unsafe_code = "allow"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

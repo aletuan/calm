@@ -1,0 +1,330 @@
+import { useCallback, useEffect, useState } from "react";
+import { useI18n } from "../i18n";
+import type { MessageKey } from "../i18n/en";
+import { POSITIONS, scopeApprove, scopeList, scopeNetwork, scopeRevoke, TARGET_ROLES, type DraftError, type NetworkBinding, type ScopeError, type ScopeView } from "../lib/assess";
+import { fmtLocal } from "../lib/format";
+import { draftErrorKey, draftErrorRow, emptyScopeForm, emptyTarget, toDraft, VALIDITY_CHOICES, type FormProblem, type ScopeForm } from "../lib/scopeForm";
+
+/**
+ * Scope grant (M2.1), step 1 of Assessment: what may be probed, from which
+ * network, until when. Approved once; a change means revoke and approve again.
+ */
+
+export function NetworkLine({ n }: { n: NetworkBinding | null }) {
+  const { t } = useI18n();
+  if (!n) return <span className="meta">{t("scope.network.unknown")}</span>;
+  return (
+    <span>
+      {t("scope.network.gateway")} <span className="mono">{n.gateway}</span>
+      {n.subnet && (
+        <>
+          {" "}
+          · {t("scope.network.subnet")} <span className="mono">{n.subnet}</span>
+        </>
+      )}
+      {n.ssid && (
+        <>
+          {" "}
+          · SSID <span className="mono">{n.ssid}</span>
+        </>
+      )}
+    </span>
+  );
+}
+
+function ScopeCard({ v, onRevoke, busy }: { v: ScopeView; onRevoke: () => void; busy: boolean }) {
+  const { t } = useI18n();
+  const [confirm, setConfirm] = useState(false);
+  const s = v.scope;
+  const state = v.revoked ? "revoked" : v.expired ? "expired" : "active";
+  return (
+    <div className="scope-card" data-state={state}>
+      <div className="scope-card-head">
+        <strong>{t(`scope.state.${state}` as MessageKey)}</strong>
+        <span className="meta">
+          {s.authorization_reference} · {t("scope.grantedBy")} {s.granted_by} · {t("scope.operator")} {s.operator}
+        </span>
+        <span className="push" />
+        {state === "active" &&
+          (confirm ? (
+            <>
+              <button className="chip danger" onClick={onRevoke} disabled={busy}>
+                {t("scope.revokeConfirm")}
+              </button>
+              <button className="chip" onClick={() => setConfirm(false)}>
+                {t("session.cancel")}
+              </button>
+            </>
+          ) : (
+            <button className="chip" onClick={() => setConfirm(true)} disabled={busy}>
+              {t("scope.revoke")}
+            </button>
+          ))}
+      </div>
+      <dl className="file-facts">
+        <dt>{t("scope.valid")}</dt>
+        <dd className="mono">
+          {fmtLocal(s.approved_at_ms)} → {fmtLocal(s.expires_at_ms)}
+        </dd>
+        <dt>{t("scope.network")}</dt>
+        <dd>
+          <NetworkLine n={s.network} />
+        </dd>
+        <dt>{t("position.label")}</dt>
+        <dd>{t(`position.${s.vantage ?? "unknown"}` as MessageKey)}</dd>
+        <dt>{t("scope.budget")}</dt>
+        <dd>
+          <span className="mono">{s.budget.max_probes_per_second}</span> {t("scope.perSecond")} · {t("scope.timeout")}{" "}
+          <span className="mono">{s.budget.timeout_ms / 1000}s</span> · {t("scope.oneAtATime")} · L1
+        </dd>
+      </dl>
+      <table className="flow-table session-table">
+        <thead>
+          <tr>
+            <th>{t("scope.col.target")}</th>
+            <th>{t("scope.col.ports")}</th>
+            <th>{t("scope.col.role")}</th>
+            <th>{t("scope.col.label")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {s.targets.map((x) => (
+            <tr key={x.address}>
+              <td className="mono">{x.address}</td>
+              <td className="mono">{x.ports.join(", ")}</td>
+              <td>{t(`scope.role.${x.role}` as MessageKey)}</td>
+              <td className="meta">{x.label || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function problemKey(p: FormProblem): MessageKey {
+  return p.kind === "port_text" ? "scope.err.port_text" : (`scope.err.number.${p.field}` as MessageKey);
+}
+
+function NewScope({ onDone, operator }: { onDone: () => void; operator: string }) {
+  const { t } = useI18n();
+  const [f, setF] = useState<ScopeForm>(() => emptyScopeForm(operator));
+  const [network, setNetwork] = useState<NetworkBinding | null | undefined>(undefined);
+  const [errors, setErrors] = useState<DraftError[]>([]);
+  const [problems, setProblems] = useState<FormProblem[]>([]);
+  const [other, setOther] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void scopeNetwork().then(setNetwork);
+  }, []);
+  const set = (k: keyof ScopeForm) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  const setRow = (i: number, k: keyof ScopeForm["targets"][number], v: string) =>
+    setF({ ...f, targets: f.targets.map((r, j) => (j === i ? { ...r, [k]: v } : r)) });
+  const rowErrors = (i: number) => [
+    ...problems.filter((p) => p.kind === "port_text" && p.index === i).map((p) => t(problemKey(p))),
+    ...errors.filter((e) => draftErrorRow(e) === i).map((e) => t(draftErrorKey(e))),
+  ];
+  const general = [
+    ...problems.filter((p) => p.kind !== "port_text").map((p) => t(problemKey(p))),
+    ...errors.filter((e) => draftErrorRow(e) == null).map((e) => t(draftErrorKey(e))),
+  ];
+
+  const submit = async () => {
+    setOther(null);
+    const r = toDraft(f, Date.now());
+    if (!r.ok) {
+      setProblems(r.problems);
+      setErrors([]);
+      return;
+    }
+    setProblems([]);
+    setBusy(true);
+    try {
+      await scopeApprove(r.draft);
+      setErrors([]);
+      onDone();
+    } catch (e) {
+      const se = e as ScopeError;
+      if (se?.kind === "invalid") setErrors(se.detail);
+      else setOther(t(`scope.err.${se?.kind ?? "store"}` as MessageKey));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="scope-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void submit();
+      }}
+    >
+      <p className="meta">{t("scope.formIntro")}</p>
+      <div className="session-form">
+        <label>
+          <span>{t("scope.field.auth")} *</span>
+          <input value={f.authorization_reference} onChange={set("authorization_reference")} maxLength={200} />
+        </label>
+        <label>
+          <span>{t("scope.field.grantedBy")} *</span>
+          <input value={f.granted_by} onChange={set("granted_by")} maxLength={200} />
+        </label>
+        <label>
+          <span>{t("scope.field.operator")} *</span>
+          <input value={f.operator} onChange={set("operator")} maxLength={200} />
+        </label>
+        <label>
+          <span>{t("scope.field.validity")}</span>
+          <select value={f.hours} onChange={set("hours")}>
+            {VALIDITY_CHOICES.map((h) => (
+              <option key={h} value={h}>
+                {Number(h) < 24 ? `${h} ${t("scope.hours")}` : `${Number(h) / 24} ${t("session.retention.days")}`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>{t("scope.field.rate")}</span>
+          <input value={f.rate} onChange={set("rate")} inputMode="numeric" />
+        </label>
+        <label>
+          <span>{t("scope.field.timeout")}</span>
+          <input value={f.timeout_s} onChange={set("timeout_s")} inputMode="decimal" />
+        </label>
+      </div>
+
+      <h3 className="subsection">{t("scope.targets")}</h3>
+      <p className="meta small field-hint">{t("scope.targetsHint")}</p>
+      <div className="target-rows">
+        {f.targets.map((r, i) => (
+          <div className="target-row" key={i}>
+            <input
+              className="mono"
+              placeholder="192.168.1.1"
+              aria-label={t("scope.col.target")}
+              value={r.address}
+              onChange={(e) => setRow(i, "address", e.target.value)}
+            />
+            <input
+              className="mono"
+              placeholder="80, 443"
+              aria-label={t("scope.col.ports")}
+              value={r.ports}
+              onChange={(e) => setRow(i, "ports", e.target.value)}
+            />
+            <select aria-label={t("scope.col.role")} value={r.role} onChange={(e) => setRow(i, "role", e.target.value)}>
+              {TARGET_ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {t(`scope.role.${role}` as MessageKey)}
+                </option>
+              ))}
+            </select>
+            <input placeholder={t("scope.col.label")} aria-label={t("scope.col.label")} value={r.label} onChange={(e) => setRow(i, "label", e.target.value)} />
+            <button
+              type="button"
+              className="chip small"
+              aria-label={t("scope.removeTarget")}
+              disabled={f.targets.length === 1}
+              onClick={() => setF({ ...f, targets: f.targets.filter((_, j) => j !== i) })}
+            >
+              ×
+            </button>
+            {rowErrors(i).length > 0 && (
+              <span className="form-error row-error" role="alert">
+                {rowErrors(i).join(" · ")}
+              </span>
+            )}
+            <span className="meta small role-hint">{t(`scope.roleHint.${r.role}` as MessageKey)}</span>
+          </div>
+        ))}
+      </div>
+      <button type="button" className="chip small" onClick={() => setF({ ...f, targets: [...f.targets, emptyTarget("other")] })} disabled={f.targets.length >= 16}>
+        + {t("scope.addTarget")}
+      </button>
+
+      <div className="bind-line">
+        <span className="meta">{t("scope.bindTo")}:</span> {network === undefined ? <span className="meta">…</span> : <NetworkLine n={network} />}
+      </div>
+      <div className="session-form position-line">
+      <label className="wide">
+        <span>{t("position.label")} *</span>
+        <select value={f.vantage} onChange={(e) => setF({ ...f, vantage: e.target.value as ScopeForm["vantage"] })}>
+          <option value="" disabled>
+            {t("position.choose")}
+          </option>
+          {POSITIONS.map((p) => (
+            <option key={p} value={p}>
+              {t(`position.${p}` as MessageKey)}
+            </option>
+          ))}
+        </select>
+        <span className="small">{t("position.hint")}</span>
+      </label>
+      </div>
+      <label className="confirm-line">
+        <input type="checkbox" checked={f.confirmed} onChange={(e) => setF({ ...f, confirmed: e.target.checked })} /> {t("scope.confirm")}
+      </label>
+      <div className="form-actions">
+        <button className="button-primary" type="submit" disabled={busy}>
+          {t("scope.approve")}
+        </button>
+        {(general.length > 0 || other) && (
+          <span className="form-error" role="alert">
+            {[...general, ...(other ? [other] : [])].join(" · ")}
+          </span>
+        )}
+      </div>
+    </form>
+  );
+}
+
+export function ScopePanel({ operator, onChange }: { operator: string; onChange?: () => void }) {
+  const { t } = useI18n();
+  const [scopes, setScopes] = useState<ScopeView[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const loaded = useCallback(() => void scopeList().then(setScopes), []);
+  // After approve or revoke, the screen around the panel refreshes too.
+  const reload = useCallback(() => {
+    loaded();
+    onChange?.();
+  }, [loaded, onChange]);
+  useEffect(loaded, [loaded]);
+  if (!scopes) return <p className="meta">{t("topology.loading")}</p>;
+  const current = scopes.find((v) => !v.revoked && !v.expired) ?? null;
+  const past = scopes.filter((v) => v !== current);
+  return (
+    <div className="scope-panel">
+      {current ? (
+        <ScopeCard
+          v={current}
+          busy={busy}
+          onRevoke={() => {
+            setBusy(true);
+            void scopeRevoke(current.scope.id)
+              .then(reload)
+              .finally(() => setBusy(false));
+          }}
+        />
+      ) : (
+        <>
+          <div className="notice">
+            <strong>{t("assessment.empty.title")}</strong>
+            <p>{t("scope.noneBody")}</p>
+          </div>
+          <NewScope operator={operator} onDone={reload} />
+        </>
+      )}
+      {past.length > 0 && (
+        <details className="past-scopes">
+          <summary className="meta">
+            {t("scope.past")} ({past.length})
+          </summary>
+          {past.map((v) => (
+            <ScopeCard key={v.scope.id} v={v} busy onRevoke={() => {}} />
+          ))}
+        </details>
+      )}
+    </div>
+  );
+}

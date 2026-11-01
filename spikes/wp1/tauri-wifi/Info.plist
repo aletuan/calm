@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>NSLocationUsageDescription</key><string>Calm spike: reading the connected Wi-Fi SSID/BSSID requires Location access on macOS.</string>
+  <key>NSLocationWhenInUseUsageDescription</key><string>Calm spike: reading the connected Wi-Fi SSID/BSSID requires Location access on macOS.</string>
+</dict></plist>

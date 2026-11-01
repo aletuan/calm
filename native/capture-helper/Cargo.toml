@@ -1,0 +1,17 @@
+[package]
+name = "calm-capture-helper"
+description = "Minimal privileged packet-capture helper (libpcap/BPF). Narrow interface, no UI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "calm-capture-helper"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints]
+workspace = true

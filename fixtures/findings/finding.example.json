@@ -1,0 +1,17 @@
+{
+  "schema_version": "auditor-finding-v1",
+  "session_id": "demo-session-001",
+  "finding_id": "WIFI-SEC-014",
+  "status": "fail",
+  "title": "Guest can reach approved management test endpoint",
+  "severity": "high",
+  "confidence": "high",
+  "vantage": "guest_wifi_laptop",
+  "tested_target": "192.0.2.10:443",
+  "verified_claims": ["TCP connection was established to the approved endpoint"],
+  "unverified_claims": ["Authentication bypass", "Access to management data"],
+  "evidence_refs": ["evidence-198"],
+  "scope_id": "scope-demo-001",
+  "recommendation": "Review guest-to-management network segmentation and intended access policy",
+  "example_only": true
+}
