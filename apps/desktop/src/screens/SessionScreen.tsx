@@ -4,7 +4,8 @@ import { useStoreOpened } from "../app/session";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { fmtBytes, fmtLocal } from "../lib/format";
-import type { StoreError } from "../lib/ipc";
+import { storeErrorMessage } from "../lib/errorMessage";
+import { ErrorText, FormErrors } from "./ErrorText";
 import { SaveButton, SaveStatusLine } from "./SaveStatus";
 import { useSelection } from "../app/selection";
 import { findingsList, scopeList, type ScopeView } from "../lib/assess";
@@ -19,21 +20,6 @@ import { emptyForm, parseSessionForm, RETENTION_CHOICES, type FormError, type Se
  * creating a session is a button; how data is stored is one click away.
  * The scope grant itself lives in Assessment, where probes are sent.
  */
-
-function storeErrorText(e: StoreError, t: (k: MessageKey) => string): string {
-  switch (e.kind) {
-    case "key_mismatch":
-      return t("store.err.keyMismatch");
-    case "key_unavailable":
-      return `${t("store.err.keyUnavailable")} (${e.detail})`;
-    case "not_found":
-      return t("store.err.notFound");
-    case "unsupported_schema":
-      return t("store.err.schema");
-    default:
-      return `${t("store.err.other")}: ${"detail" in e ? String(e.detail) : ""}`;
-  }
-}
 
 function NewSession({ onCreate, onCancel, busy }: { onCreate: (f: SessionForm) => Promise<FormError[] | null>; onCancel?: () => void; busy: boolean }) {
   const { t } = useI18n();
@@ -85,11 +71,7 @@ function NewSession({ onCreate, onCancel, busy }: { onCreate: (f: SessionForm) =
             {t("session.cancel")}
           </button>
         )}
-        {errors.length > 0 && (
-          <span className="form-error" role="alert">
-            {errors.map((e) => t(`session.err.${e}` as MessageKey)).join(" · ")}
-          </span>
-        )}
+        <FormErrors messages={errors.map((e) => t(`session.err.${e}` as MessageKey))} />
       </div>
     </form>
   );
@@ -218,7 +200,7 @@ export function SessionScreen() {
       {s.status?.state === "error" && s.status.error && (
         <div className="notice" role="alert">
           <strong>{t("store.locked.title")}</strong>
-          <p>{storeErrorText(s.status.error, t)}</p>
+          <ErrorText message={storeErrorMessage(s.status.error)} />
           {s.status.error.kind === "key_mismatch" && (
             <>
               <p className="meta">{t("store.setAside.body")}</p>
@@ -231,7 +213,7 @@ export function SessionScreen() {
       )}
       {s.error && (
         <div className="notice" role="alert">
-          {storeErrorText(s.error, t)}
+          <ErrorText message={storeErrorMessage(s.error)} />
         </div>
       )}
       {s.status && s.status.purged_on_open > 0 && (

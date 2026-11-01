@@ -773,9 +773,19 @@ body {
   align-items: center;
   gap: var(--space-3);
 }
+/* One error per line: each is a full sentence (voice guide, input errors). */
 .form-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+  margin: 0;
+  padding: 0;
+  list-style: none;
   color: var(--color-text-primary);
   font-size: var(--text-meta);
+}
+.error-detail {
+  margin-top: var(--gap-tight);
 }
 .session-table tr[aria-current="true"] td {
   background: var(--color-bg-surface);
@@ -1103,7 +1113,7 @@ body {
   grid-column: 1 / -1;
   margin: 0;
 }
-.target-row .row-error::before {
+.target-row .row-error li::before {
   content: "↑ ";
 }
 .bind-line,
@@ -1519,6 +1529,11 @@ body {
 }
 .session-form .form-actions {
   margin: 0;
+  flex-wrap: wrap;
+}
+/* Errors sit on their own line under the buttons, not beside them. */
+.form-actions .form-error {
+  flex-basis: 100%;
 }
 .new-session .session-form {
   margin-bottom: 0;

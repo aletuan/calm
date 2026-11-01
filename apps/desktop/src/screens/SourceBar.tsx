@@ -1,23 +1,9 @@
 import { useImport } from "../app/imported";
 import { useStoreOpened } from "../app/session";
 import { useI18n } from "../i18n";
-import type { MessageKey } from "../i18n/en";
-import { fmtBytes } from "../lib/format";
-import type { ImportError } from "../lib/ipc";
+import { importErrorMessage } from "../lib/errorMessage";
+import { ErrorText } from "./ErrorText";
 import { SaveButton, SaveStatusLine } from "./SaveStatus";
-
-function errorText(e: ImportError, t: (k: MessageKey) => string): string {
-  switch (e.kind) {
-    case "not_a_capture":
-      return t("import.err.notCapture");
-    case "too_large":
-      return `${t("import.err.tooLarge")} (${fmtBytes(e.size_bytes)} > ${fmtBytes(e.limit_bytes)})`;
-    case "unreadable":
-      return `${t("import.err.unreadable")}: ${e.detail}`;
-    default:
-      return "";
-  }
-}
 
 /**
  * Source switch shared by Traffic and Topology: this Mac's live data, one
@@ -64,10 +50,10 @@ export function SourceBar() {
         )}
       </div>
       <SaveStatusLine />
-      {error && (
+      {error && importErrorMessage(error) && (
         <div className="notice" role="alert">
           <strong>{t("import.err.title")}</strong>
-          <p>{errorText(error, t)}</p>
+          <ErrorText message={importErrorMessage(error)!} />
         </div>
       )}
     </>

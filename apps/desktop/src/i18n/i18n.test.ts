@@ -67,6 +67,7 @@ describe("i18n", () => {
     const entries = (d: Record<string, string>) => Object.entries(d);
     /** The user's own attestations are the only first-person strings. */
     const ATTESTATIONS = new Set(["scope.confirm", "assess.receiverConfirm"]);
+    const BUTTONS = ["session.create", "session.use", "session.delete", "session.confirmDelete", "session.new", "session.saveLive", "session.saveImport", "session.view", "session.open", "session.cancel", "scope.approve", "scope.revoke", "scope.revokeConfirm", "scope.addTarget", "scope.removeTarget", "assess.run", "assess.stop", "assess.openFindings", "assess.goScope", "inspector.traffic.open", "inspector.close", "import.pick", "topology.reset", "store.setAside", "import.clear", "import.replace", "perm.button", "session.closeSaved", "save.retry"] as const;
 
     it("Vietnamese addresses the user as \"bạn\", never anh/chị, and avoids blaming words", () => {
       const wordAt = (w: string) => new RegExp(`(^|[\\s("“])${w}(?=[\\s,.;:)"”]|$)`, "i");
@@ -86,14 +87,13 @@ describe("i18n", () => {
     });
 
     it("buttons are short and in sentence case", () => {
-      const BUTTONS = ["session.create", "session.use", "session.delete", "session.confirmDelete", "session.new", "session.saveLive", "session.saveImport", "session.view", "session.open", "session.cancel", "scope.approve", "scope.revoke", "scope.revokeConfirm", "scope.addTarget", "scope.removeTarget", "assess.run", "assess.stop", "assess.openFindings", "assess.goScope", "inspector.traffic.open", "inspector.close", "import.pick", "topology.reset"] as const;
-      const PROPER = /^(Mac|Calm|PCAP|PCAPNG|Wi-Fi|DNS|IP|TCP|Findings|Traffic|Topology|Sessions|Assessment|S0\d|N0\d|\/)…?$/;
+      const PROPER = /^(Mac|Calm|Location|PCAP|PCAPNG|Wi-Fi|DNS|IP|TCP|Findings|Traffic|Topology|Sessions|Assessment|S0\d|N0\d|\/)…?$/;
       for (const k of BUTTONS) {
         for (const d of [en, vi]) {
           const words = d[k].split(/\s+/);
           expect(words.length, `${k}: ${d[k]}`).toBeLessThanOrEqual(4);
           expect(d[k].endsWith("."), k).toBe(false);
-          for (const w of words.slice(1)) if (/^[A-ZÀ-Ỹ]/.test(w)) expect(PROPER.test(w), `${k}: "${w}" in "${d[k]}"`).toBe(true);
+          for (const w of words.slice(1)) if (w[0] !== w[0]!.toLowerCase()) expect(PROPER.test(w), `${k}: "${w}" in "${d[k]}"`).toBe(true);
         }
       }
     });
@@ -109,6 +109,52 @@ describe("i18n", () => {
 
     it("the stop control has one name everywhere", () => {
       for (const d of [en, vi]) for (const [k, v] of entries(d)) expect(/Emergency Stop/.test(v), k).toBe(false);
+    });
+
+    it("Vietnamese uses one spelling for the same word (uỷ, hoá, khoá, xoá)", () => {
+      for (const [k, v] of entries(vi)) expect(/ủy|(h|kh|x)óa/i.test(v), `${k}: ${v}`).toBe(false);
+    });
+
+    it("one term per concept: authorization reference is \"mã uỷ quyền\", inferred is \"suy luận\"", () => {
+      for (const [k, v] of entries(vi)) {
+        expect(/tham chiếu/i.test(v), `${k}: ${v}`).toBe(false);
+        expect(/suy ra/i.test(v), `${k}: ${v}`).toBe(false);
+      }
+    });
+
+    it("buttons, field labels and columns stay close to the English length", () => {
+      // VI runs longer by nature; where width is fixed, at most 1.3× (or 6 characters on very short labels).
+      const fixedWidth = (k: string) => (BUTTONS as readonly string[]).includes(k) || /\.(col|field)\./.test(k) || k.startsWith("nav.");
+      for (const k of Object.keys(en) as (keyof typeof en)[]) {
+        if (!fixedWidth(k)) continue;
+        expect(vi[k].length, `${k}: ${en[k]} → ${vi[k]}`).toBeLessThanOrEqual(Math.max(en[k].length * 1.3, en[k].length + 6));
+      }
+    });
+
+    // Batch 2 (forms and errors). Batch 3 extends these groups to the rest.
+    const REWRITTEN = ["scope", "session", "import", "store", "field", "save", "perm", "time", "position", "role"];
+    const rewritten = (d: Record<string, string>) => entries(d).filter(([k]) => REWRITTEN.includes(k.split(".")[0]!));
+
+    it("an input error says what is accepted, as a full sentence with nothing hidden in parentheses", () => {
+      for (const d of [en, vi])
+        for (const [k, v] of entries(d)) {
+          if (!/^(scope|session)\.err\./.test(k)) continue;
+          expect(v[0] !== v[0]!.toLowerCase(), `${k} starts with a capital: ${v}`).toBe(true);
+          expect(v.endsWith("."), `${k} ends with a period: ${v}`).toBe(true);
+          expect(v.includes("("), `${k}: ${v}`).toBe(false);
+        }
+    });
+
+    it("a system error names what Calm could not do", () => {
+      for (const d of [en, vi]) for (const k of ["store.locked.title", "import.err.title", "scope.err.store", "save.failedLine"] as const) expect(d[k], k).toMatch(/^Calm /);
+    });
+
+    it("rewritten text uses periods, not dashes, and no internal milestone names", () => {
+      for (const d of [en, vi])
+        for (const [k, v] of rewritten(d)) {
+          expect(v.includes(" — "), `${k}: ${v}`).toBe(false);
+          expect(/\bM\d(\.\d)?\b/.test(v), `${k}: ${v}`).toBe(false);
+        }
     });
   });
 });

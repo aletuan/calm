@@ -3,6 +3,7 @@ import { useImport } from "../app/imported";
 import { useSession } from "../app/session";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/en";
+import { saveErrorDetail } from "../lib/errorMessage";
 import { fmtLocalTime } from "../lib/format";
 import { SAVED_FLASH_MS, saveUi } from "../lib/saveState";
 
@@ -85,7 +86,7 @@ export function SaveStatusLine() {
   if (s.saveError) {
     return (
       <p className="save-line failed" role="alert">
-        {t("save.failedLine")}: {"detail" in s.saveError ? String(s.saveError.detail) : s.saveError.kind}
+        {t("save.failedLine")} <span className="meta">{t("error.detail")}: <span className="mono">{saveErrorDetail(s.saveError)}</span></span>
       </p>
     );
   }

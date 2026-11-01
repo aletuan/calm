@@ -3,6 +3,7 @@ import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import { POSITIONS, scopeApprove, scopeList, scopeNetwork, scopeRevoke, TARGET_ROLES, type DraftError, type NetworkBinding, type ScopeError, type ScopeView } from "../lib/assess";
 import { fmtLocal } from "../lib/format";
+import { FormErrors } from "./ErrorText";
 import { draftErrorKey, draftErrorRow, emptyScopeForm, emptyTarget, toDraft, VALIDITY_CHOICES, type FormProblem, type ScopeForm } from "../lib/scopeForm";
 
 /**
@@ -230,11 +231,7 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
             >
               ×
             </button>
-            {rowErrors(i).length > 0 && (
-              <span className="form-error row-error" role="alert">
-                {rowErrors(i).join(" · ")}
-              </span>
-            )}
+            <FormErrors className="row-error" messages={rowErrors(i)} />
             <span className="meta small role-hint">{t(`scope.roleHint.${r.role}` as MessageKey)}</span>
           </div>
         ))}
@@ -269,11 +266,7 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
         <button className="button-primary" type="submit" disabled={busy}>
           {t("scope.approve")}
         </button>
-        {(general.length > 0 || other) && (
-          <span className="form-error" role="alert">
-            {[...general, ...(other ? [other] : [])].join(" · ")}
-          </span>
-        )}
+        <FormErrors messages={[...general, ...(other ? [other] : [])]} />
       </div>
     </form>
   );

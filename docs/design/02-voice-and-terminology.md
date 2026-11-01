@@ -1,6 +1,6 @@
 # Calm: voice, text patterns and terminology
 
-**Status:** Accepted, 2026-11-01. The mechanical rules are enforced by `apps/desktop/src/i18n/i18n.test.ts` ("voice rules").
+**Status:** Accepted, 2026-11-01. Batch 2 (forms and errors) applied the same day. The mechanical rules are enforced by `apps/desktop/src/i18n/i18n.test.ts` ("voice rules").
 
 ## Voice
 
@@ -48,7 +48,7 @@ When these four traits conflict, the earlier one wins:
    - Sentences: under 20 words.
    - Screen descriptions: at most 2 sentences.
    - Tooltips: under 120 characters.
-   - VI may run about 30% longer than EN.
+   - VI runs longer by nature. Where width is fixed (buttons, field labels, column headers), VI stays within 1.3× EN, or 6 characters more on very short labels. Running text has no length ratio.
 6. **One idea per sentence.** Never hide something important in parentheses.
 7. **Numbers.**
    - Use numerals, with a space before the unit (4 ms).
@@ -58,7 +58,8 @@ When these four traits conflict, the earlier one wins:
    - EN: invalid, failed, please, simply, obviously, fatal, and internal build words (skeleton, alpha, stub, L0).
    - VI: vui lòng, không hợp lệ, thất bại.
 9. **Certainty matches the evidence.** "Calm saw" (observed), "likely" (inferred), "not checked" (unverified). Never claim "safe" or "secure" outright.
-10. **Data stays data.**
+10. **One spelling.** VI uses the older tone placement throughout: uỷ, hoá, khoá, xoá (not ủy, hóa, khóa, xóa).
+11. **Data stays data.**
     - IPs, ports, commands and check IDs are in monospace.
     - Data values (SSID, hostnames) are never translated.
 
@@ -71,8 +72,8 @@ When these four traits conflict, the earlier one wins:
 | Primary button | Verb + object ("Approve scope", "Run checks") |
 | Irreversible action | "Revoke…" opens a confirmation that states the consequence, with "[Revoke now] [Cancel]" |
 | Empty state | Title stating the situation, 1–2 sentences with the reason and next step, one button |
-| Input error | The value that is accepted ("Enter a port from 1 to 65535.") |
-| System error | Line 1: what Calm could not do. Line 2: the cause if certain, whether data is safe, what to do |
+| Input error | The value that is accepted, as a full sentence ("Enter ports from 1 to 65535."). Several errors are listed one per line, under the buttons |
+| System error | Title: "Calm could not…". Body: the cause if certain, whether data is safe, what to do. A raw code or size goes on a separate "Detail" line, never first |
 | Finding detail | What Calm saw, What this shows, What this does not show, What to do, Evidence, Method and limits |
 
 ## Terminology
@@ -99,5 +100,7 @@ When these four traits conflict, the earlier one wins:
 | Stop control | Stop everything | Dừng tất cả |
 | Second device | receiver | máy nhận |
 | Evidence | evidence | bằng chứng |
+| Owner's written permission, by id | authorization reference | mã uỷ quyền |
+| Inferred | inferred | suy luận (never "suy ra") |
 
 The research and the before/after examples behind these rules live in the shared proposal "Calm — Giọng văn và cách viết label, guidance".
