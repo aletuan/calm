@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { draftErrorKey, draftErrorRangeRow, draftErrorRow, emptyScopeForm, emptyTarget, parsePorts, toDraft } from "./scopeForm";
+import { draftErrorKey, draftErrorRangeRow, draftErrorRow, emptyScopeForm, emptyTarget, exclusionList, parsePorts, toDraft } from "./scopeForm";
 
 const NOW = 1_800_000_000_000;
 
@@ -101,6 +101,40 @@ describe("ranges, exclusions and capabilities in the draft (ADR-011)", () => {
     expect(draftErrorRangeRow({ kind: "bad_range_ports", index: 2 })).toBe(2);
     expect(draftErrorRangeRow({ kind: "bad_address", index: 0, reason: "not_private" })).toBeNull();
     expect(draftErrorRangeRow({ kind: "bad_exclusion", index: 0 })).toBeNull();
+  });
+});
+
+describe("a scope with ranges only (bug: the empty target row was sent)", () => {
+  const rangesOnly = () => ({
+    ...emptyScopeForm("Andy"),
+    authorization_reference: "R",
+    granted_by: "O",
+    ranges: [{ cidr: "192.168.1.0/24", ports: "80", label: "" }],
+    exclusions: "192.168.1.50",
+  });
+
+  it("an untouched target row is left out of the draft", () => {
+    const r = toDraft(rangesOnly(), 0);
+    if (!r.ok) throw new Error("draft");
+    expect(r.draft.targets).toEqual([]);
+    expect(r.targetRows).toEqual([]);
+  });
+
+  it("a row with anything typed in it is still sent, and errors map back to form rows", () => {
+    const f = {
+      ...rangesOnly(),
+      targets: [emptyTarget(), { address: "192.168.1.9", ports: "443", role: "other" as const, label: "" }],
+    };
+    const r = toDraft(f, 0);
+    if (!r.ok) throw new Error("draft");
+    expect(r.draft.targets.map((t) => t.address)).toEqual(["192.168.1.9"]);
+    expect(r.targetRows).toEqual([1]);
+    // An error on draft target 0 belongs to form row 1.
+    expect(draftErrorRow({ kind: "no_ports", index: 0 }, r.targetRows)).toBe(1);
+  });
+
+  it("exclusions are split the same way for the draft and for naming a bad entry", () => {
+    expect(exclusionList(" 192.168.1.50\n192.168.1.50/32, printer.local ")).toEqual(["192.168.1.50", "192.168.1.50/32", "printer.local"]);
   });
 });
 

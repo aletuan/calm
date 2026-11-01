@@ -1093,6 +1093,19 @@ body {
   gap: var(--gap-tight) var(--gap-related);
   align-items: center;
 }
+/* "Outside the network this Mac is on": a warning in words, not colour alone. */
+.target-row .outside-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-semantic-warning);
+}
+.target-row .outside-note::before {
+  content: "↑ ";
+}
+/* A one-tap suggestion sits next to the add button. */
+.chip.suggest {
+  margin-left: var(--gap-related);
+}
 /* A range row has no role column. */
 .target-row.range-row {
   grid-template-columns: minmax(150px, 1.2fr) minmax(110px, 1fr) minmax(120px, 1fr) auto;

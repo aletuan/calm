@@ -691,7 +691,7 @@ export const en = {
   "finding.todo.stopped": "Start a new run when you are ready.",
   "finding.todo.no_target": "Add a target with this check's role to the scope, then run again.",
   "scope.err.no_capabilities": "Choose at least one kind of test.",
-  "scope.err.bad_range": "Enter a private IPv4 block by its network address, such as 192.168.1.0/24.",
+  "scope.err.bad_range": "Enter a private IPv4 block by its network address, such as {example}.",
   "scope.err.range_too_large": "Use a block of at most 256 addresses, /24 or smaller.",
   "scope.err.bad_range_ports": "Enter 1 to 16 ports for the range, each from 1 to 65535.",
   "scope.err.exclusions_required": "Name at least one address the tests must never touch, such as a production till.",
@@ -721,7 +721,7 @@ export const en = {
   "scope.level.L2": "Active, use with care",
   "scope.checksNote": "The checks in Run use TCP connect. Without it, they send nothing.",
   "scope.ranges": "Allowed ranges",
-  "scope.rangesHint": "Optional. A private IPv4 block of up to 256 addresses, such as 192.168.1.0/24, with the ports allowed on every host in it.",
+  "scope.rangesHint": "Optional. A private IPv4 block of up to 256 addresses, such as {example}, with the ports allowed on every host in it.",
   "scope.col.range": "Range",
   "scope.addRange": "Add range",
   "scope.removeRange": "Remove range",
@@ -737,6 +737,11 @@ export const en = {
   "scope.neverTouched": "Never touched",
   "scope.noneChosen": "nothing chosen yet",
   "scope.err.range_port_text": "Enter the range's ports as numbers separated by commas, such as 80, 443.",
+  "scope.err.bad_exclusion_value": "Enter one IP address per line. This entry is not one: {value}.",
+  "scope.suggest.router": "Use this network's router ({address})",
+  "scope.suggest.range": "Use this network's range ({cidr})",
+  "scope.suggest.narrowed": "This network is wider than 256 addresses, so the suggestion is the /24 around its gateway.",
+  "scope.outsideNetwork": "Outside the network this Mac is on. Probes would go through the gateway to another segment.",
 } as const;
 
 export type MessageKey = keyof typeof en;

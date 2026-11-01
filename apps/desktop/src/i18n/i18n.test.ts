@@ -62,6 +62,8 @@ describe("i18n", () => {
   it("product claims stay honest in both languages", () => {
     // The user attests to the capabilities they ticked, not a fixed sentence (ADR-011).
     for (const d of [en, vi]) expect(d["scope.confirm"]).toContain("{caps}");
+    // Examples come from the network this Mac is on, not a fixed address someone could copy.
+    for (const d of [en, vi]) expect(d["scope.rangesHint"]).toContain("{example}");
     // Imported data must never be described as observed by this Mac.
     expect(en["import.banner.title"]).toMatch(/not observed by this Mac/);
     expect(vi["import.banner.title"]).toMatch(/không phải do Mac này quan sát/);

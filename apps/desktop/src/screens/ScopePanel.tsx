@@ -5,7 +5,8 @@ import { POSITIONS, scopeApprove, scopeList, scopeNetwork, scopeRevoke, TARGET_R
 import { fmtLocal } from "../lib/format";
 import { FormErrors } from "./ErrorText";
 import { CAPABILITIES, capabilityLevel, capsText, NSE_ALLOWLIST, toggleCapability } from "../lib/capabilities";
-import { draftErrorKey, draftErrorRangeRow, draftErrorRow, emptyRange, emptyScopeForm, emptyTarget, toDraft, VALIDITY_CHOICES, type FormProblem, type RangeRow, type ScopeForm } from "../lib/scopeForm";
+import { outsideNetwork, placeholders, rangeSuggestion, routerSuggestion, withRange, withRouter } from "../lib/scopeSuggest";
+import { draftErrorKey, draftErrorRangeRow, draftErrorRow, emptyRange, emptyScopeForm, emptyTarget, exclusionList, toDraft, VALIDITY_CHOICES, type FormProblem, type RangeRow, type ScopeForm } from "../lib/scopeForm";
 
 /**
  * Scope grant, step 1 of Assessment: what may be probed, from which network,
@@ -139,6 +140,8 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
   const [network, setNetwork] = useState<NetworkBinding | null | undefined>(undefined);
   const [errors, setErrors] = useState<DraftError[]>([]);
   const [problems, setProblems] = useState<FormProblem[]>([]);
+  // Which form row each sent target came from (empty rows are not sent).
+  const [targetRows, setTargetRows] = useState<number[]>([]);
   const [other, setOther] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -149,17 +152,29 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
     setF({ ...f, targets: f.targets.map((r, j) => (j === i ? { ...r, [k]: v } : r)) });
   const rowErrors = (i: number) => [
     ...problems.filter((p) => p.kind === "port_text" && p.index === i).map((p) => t(problemKey(p))),
-    ...errors.filter((e) => draftErrorRow(e) === i).map((e) => t(draftErrorKey(e))),
+    ...errors.filter((e) => draftErrorRow(e, targetRows) === i).map((e) => t(draftErrorKey(e))),
   ];
+  // One-tap suggestions and placeholders from the network this Mac is on.
+  const net = network ?? null;
+  const router = routerSuggestion(net);
+  const suggestedRange = rangeSuggestion(net);
+  const ph = placeholders(net);
+  const outside = (text: string) => outsideNetwork(text, net) === true;
   const setRange = (i: number, k: keyof RangeRow, v: string) => setF({ ...f, ranges: f.ranges.map((r, j) => (j === i ? { ...r, [k]: v } : r)) });
   const rangeErrors = (i: number) => [
     ...problems.filter((p) => p.kind === "range_port_text" && p.index === i).map((p) => t(problemKey(p))),
-    ...errors.filter((e) => draftErrorRangeRow(e) === i).map((e) => t(draftErrorKey(e))),
+    ...errors.filter((e) => draftErrorRangeRow(e) === i).map((e) => t(draftErrorKey(e)).replace("{example}", ph.range)),
   ];
+  const isExclusionError = (e: DraftError) => e.kind === "bad_exclusion" || e.kind === "exclusions_required";
+  const exclusionErrors = errors.filter(isExclusionError).map((e) =>
+    e.kind === "bad_exclusion" ? t("scope.err.bad_exclusion_value").replace("{value}", exclusionList(f.exclusions)[e.index] ?? "") : t(draftErrorKey(e)),
+  );
   const general = [
     ...problems.filter((p) => p.kind === "number_text").map((p) => t(problemKey(p))),
-    ...errors.filter((e) => draftErrorRow(e) == null && draftErrorRangeRow(e) == null).map((e) => t(draftErrorKey(e))),
+    ...errors.filter((e) => draftErrorRow(e, targetRows) == null && draftErrorRangeRow(e) == null && !isExclusionError(e)).map((e) => t(draftErrorKey(e))),
   ];
+  // After a refused submit, bring the first error into view: it may be far above the button.
+  const showFirstError = () => requestAnimationFrame(() => document.querySelector(".scope-form .form-error")?.scrollIntoView({ block: "center", behavior: "smooth" }));
 
   const submit = async () => {
     setOther(null);
@@ -167,9 +182,11 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
     if (!r.ok) {
       setProblems(r.problems);
       setErrors([]);
+      showFirstError();
       return;
     }
     setProblems([]);
+    setTargetRows(r.targetRows);
     setBusy(true);
     try {
       await scopeApprove(r.draft);
@@ -177,8 +194,10 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
       onDone();
     } catch (e) {
       const se = e as ScopeError;
-      if (se?.kind === "invalid") setErrors(se.detail);
-      else setOther(t(`scope.err.${se?.kind ?? "store"}` as MessageKey));
+      if (se?.kind === "invalid") {
+        setErrors(se.detail);
+        showFirstError();
+      } else setOther(t(`scope.err.${se?.kind ?? "store"}` as MessageKey));
     } finally {
       setBusy(false);
     }
@@ -233,7 +252,7 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
           <div className="target-row" key={i}>
             <input
               className="mono"
-              placeholder="192.168.1.1"
+              placeholder={ph.target}
               aria-label={t("scope.col.target")}
               value={r.address}
               onChange={(e) => setRow(i, "address", e.target.value)}
@@ -257,12 +276,13 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
               type="button"
               className="chip small"
               aria-label={t("scope.removeTarget")}
-              disabled={f.targets.length === 1}
+              disabled={f.targets.length === 1 && f.ranges.length === 0}
               onClick={() => setF({ ...f, targets: f.targets.filter((_, j) => j !== i) })}
             >
               ×
             </button>
             <FormErrors className="row-error" messages={rowErrors(i)} />
+            {outside(r.address) && <span className="small outside-note">{t("scope.outsideNetwork")}</span>}
             <span className="meta small role-hint">{t(`scope.roleHint.${r.role}` as MessageKey)}</span>
           </div>
         ))}
@@ -270,20 +290,26 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
       <button type="button" className="chip small" onClick={() => setF({ ...f, targets: [...f.targets, emptyTarget("other")] })} disabled={f.targets.length >= 16}>
         + {t("scope.addTarget")}
       </button>
+      {router && !f.targets.some((x) => x.address.trim() === router.address) && (
+        <button type="button" className="chip small suggest" onClick={() => setF(withRouter(f, router))}>
+          {t("scope.suggest.router").replace("{address}", router.address)}
+        </button>
+      )}
 
       <h3 className="subsection">{t("scope.ranges")}</h3>
-      <p className="meta small field-hint">{t("scope.rangesHint")}</p>
+      <p className="meta small field-hint">{t("scope.rangesHint").replace("{example}", ph.range)}</p>
       {f.ranges.length > 0 && (
         <div className="target-rows">
           {f.ranges.map((r, i) => (
             <div className="target-row range-row" key={i}>
-              <input className="mono" placeholder="192.168.1.0/24" aria-label={t("scope.col.range")} value={r.cidr} onChange={(e) => setRange(i, "cidr", e.target.value)} />
+              <input className="mono" placeholder={ph.range} aria-label={t("scope.col.range")} value={r.cidr} onChange={(e) => setRange(i, "cidr", e.target.value)} />
               <input className="mono" placeholder="22, 80, 443" aria-label={t("scope.col.ports")} value={r.ports} onChange={(e) => setRange(i, "ports", e.target.value)} />
               <input placeholder={t("scope.col.label")} aria-label={t("scope.col.label")} value={r.label} onChange={(e) => setRange(i, "label", e.target.value)} />
               <button type="button" className="chip small" aria-label={t("scope.removeRange")} onClick={() => setF({ ...f, ranges: f.ranges.filter((_, j) => j !== i) })}>
                 ×
               </button>
               <FormErrors className="row-error" messages={rangeErrors(i)} />
+              {outside(r.cidr) && <span className="small outside-note">{t("scope.outsideNetwork")}</span>}
             </div>
           ))}
         </div>
@@ -291,11 +317,20 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
       <button type="button" className="chip small" onClick={() => setF({ ...f, ranges: [...f.ranges, emptyRange()] })} disabled={f.ranges.length >= 16}>
         + {t("scope.addRange")}
       </button>
+      {suggestedRange && !f.ranges.some((x) => x.cidr.trim() === suggestedRange.cidr) && (
+        <>
+          <button type="button" className="chip small suggest" onClick={() => setF(withRange(f, suggestedRange.cidr))}>
+            {t("scope.suggest.range").replace("{cidr}", suggestedRange.cidr)}
+          </button>
+          {suggestedRange.narrowed && <p className="meta small field-hint">{t("scope.suggest.narrowed")}</p>}
+        </>
+      )}
       {f.ranges.length > 0 && (
         <label className="wide exclusions">
           <span>{t("scope.exclusions")} *</span>
-          <textarea className="mono" rows={3} placeholder="192.168.1.50" value={f.exclusions} onChange={(e) => setF({ ...f, exclusions: e.target.value })} />
+          <textarea className="mono" rows={3} placeholder={ph.exclusion} value={f.exclusions} onChange={(e) => setF({ ...f, exclusions: e.target.value })} />
           <span className="meta small">{t("scope.exclusionsHint")}</span>
+          <FormErrors messages={exclusionErrors} />
         </label>
       )}
 

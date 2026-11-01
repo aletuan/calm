@@ -78,7 +78,16 @@ export type FormProblem =
  * Turn the form into a draft for the shell. Only text that cannot become a
  * draft at all is reported here; every rule is enforced by the shell.
  */
-export function toDraft(f: ScopeForm, now: number): { ok: true; draft: ScopeDraft } | { ok: false; problems: FormProblem[] } {
+/** Excluded addresses as typed: one per line, or separated by commas, spaces or semicolons. */
+export const exclusionList = (text: string): string[] => text.split(/[\s,;]+/).filter(Boolean);
+
+/** A target row the user never touched (the form always shows one). */
+const untouched = (t: TargetRow) => !t.address.trim() && !t.ports.trim() && !t.label.trim();
+
+export function toDraft(
+  f: ScopeForm,
+  now: number,
+): { ok: true; draft: ScopeDraft; targetRows: number[] } | { ok: false; problems: FormProblem[] } {
   const problems: FormProblem[] = [];
   const num = (field: "hours" | "rate" | "timeout_s") => {
     const v = Number(f[field].trim());
@@ -88,7 +97,10 @@ export function toDraft(f: ScopeForm, now: number): { ok: true; draft: ScopeDraf
   const hours = num("hours");
   const rate = num("rate");
   const timeout = num("timeout_s");
-  const targets = f.targets.map((t, index) => {
+  // Draft target i is form row targetRows[i]: the shell's error indexes count sent rows only.
+  const targetRows = f.targets.flatMap((t, index) => (untouched(t) ? [] : [index]));
+  const targets = targetRows.map((index) => {
+    const t = f.targets[index]!;
     const ports = parsePorts(t.ports);
     if (!ports) problems.push({ kind: "port_text", index });
     return { address: t.address.trim(), ports: ports ?? [], role: t.role, label: t.label };
@@ -101,6 +113,7 @@ export function toDraft(f: ScopeForm, now: number): { ok: true; draft: ScopeDraf
   if (problems.length) return { ok: false, problems };
   return {
     ok: true,
+    targetRows,
     draft: {
       authorization_reference: f.authorization_reference,
       operator: f.operator,
@@ -113,7 +126,7 @@ export function toDraft(f: ScopeForm, now: number): { ok: true; draft: ScopeDraf
       vantage: f.vantage || null,
       capabilities: f.capabilities,
       ranges,
-      exclusions: f.exclusions.split(/[\s,;]+/).filter(Boolean),
+      exclusions: exclusionList(f.exclusions),
       nse_scripts: f.nse_scripts,
     },
   };
@@ -128,9 +141,10 @@ export function draftErrorKey(e: DraftError): MessageKey {
 /** Errors whose index is a target row. Range, exclusion and script errors index other lists. */
 const TARGET_ROW_ERRORS: DraftError["kind"][] = ["bad_address", "duplicate_address", "no_ports", "too_many_ports", "bad_port"];
 
-/** Which target row an error belongs to, if any. */
-export function draftErrorRow(e: DraftError): number | null {
-  return "index" in e && TARGET_ROW_ERRORS.includes(e.kind) ? e.index : null;
+/** Which form target row an error belongs to, if any. `targetRows` maps draft targets to form rows. */
+export function draftErrorRow(e: DraftError, targetRows?: number[]): number | null {
+  if (!("index" in e) || !TARGET_ROW_ERRORS.includes(e.kind)) return null;
+  return targetRows ? (targetRows[e.index] ?? null) : e.index;
 }
 
 const RANGE_ROW_ERRORS: DraftError["kind"][] = ["bad_range", "range_too_large", "bad_range_ports"];
