@@ -95,6 +95,12 @@ function ScopeCard({ v, onRevoke, busy }: { v: ScopeView; onRevoke: () => void; 
             <dd className="mono">{s.exclusions.join(", ")}</dd>
           </>
         )}
+        {s.nothing_to_exclude && (
+          <>
+            <dt>{t("scope.neverTouched")}</dt>
+            <dd>{t("scope.noneToAvoid")}</dd>
+          </>
+        )}
       </dl>
       <table className="flow-table session-table">
         <thead>
@@ -165,7 +171,7 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
     ...problems.filter((p) => p.kind === "range_port_text" && p.index === i).map((p) => t(problemKey(p))),
     ...errors.filter((e) => draftErrorRangeRow(e) === i).map((e) => t(draftErrorKey(e)).replace("{example}", ph.range)),
   ];
-  const isExclusionError = (e: DraftError) => e.kind === "bad_exclusion" || e.kind === "exclusions_required";
+  const isExclusionError = (e: DraftError) => e.kind === "bad_exclusion" || e.kind === "exclusions_required" || e.kind === "exclusions_contradict";
   const exclusionErrors = errors.filter(isExclusionError).map((e) =>
     e.kind === "bad_exclusion" ? t("scope.err.bad_exclusion_value").replace("{value}", exclusionList(f.exclusions)[e.index] ?? "") : t(draftErrorKey(e)),
   );
@@ -327,12 +333,18 @@ function NewScope({ onDone, operator }: { onDone: () => void; operator: string }
       )}
       {f.ranges.length > 0 && (
         <label className="wide exclusions">
-          <span>{t("scope.exclusions")} *</span>
+          <span>{t("scope.exclusions")}</span>
           <textarea className="mono" rows={3} placeholder={ph.exclusion} value={f.exclusions} onChange={(e) => setF({ ...f, exclusions: e.target.value })} />
           <span className="meta small">{t("scope.exclusionsHint")}</span>
-          <FormErrors messages={exclusionErrors} />
         </label>
       )}
+      {f.ranges.length > 0 && (
+        <label className="confirm-line nothing-to-exclude">
+          <input type="checkbox" checked={f.nothing_to_exclude} onChange={(e) => setF({ ...f, nothing_to_exclude: e.target.checked })} />{" "}
+          {t("scope.nothingToExclude")}
+        </label>
+      )}
+      {f.ranges.length > 0 && <FormErrors messages={exclusionErrors} />}
 
       <h3 className="subsection">{t("scope.capabilities")}</h3>
       <p className="meta small field-hint">{t("scope.capabilitiesHint")}</p>

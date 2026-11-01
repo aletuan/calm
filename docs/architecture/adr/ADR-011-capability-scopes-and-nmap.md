@@ -12,7 +12,7 @@ ADR-010 allows one kind of traffic: a TCP connect to literal private addresses, 
 
 ### 1. A scope lists capabilities, not only addresses
 The scope keeps targets, rate, validity and network binding (ADR-010), and adds:
-- `ranges`: private CIDR blocks, at most /24 each. `exclusions` are **required** when ranges are used (production POS, guests' devices).
+- `ranges`: private CIDR blocks, at most /24 each. With ranges, the owner either lists `exclusions` (production POS, guests' devices) or confirms `nothing_to_exclude`; leaving both empty is refused, and both at once is a contradiction (refused). The confirmation is recorded instead of a made-up address.
 - `capabilities`, each off by default and ticked by the owner:
 
 | Capability | Level | Nmap | What it sends beyond a TCP connect |

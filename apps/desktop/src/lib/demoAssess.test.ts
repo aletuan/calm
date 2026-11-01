@@ -83,6 +83,8 @@ describe("demo validation of capabilities, ranges and scripts (same as Rust appr
 
   it("ranges need valid ports and exclusions; exclusions must be addresses", () => {
     expect(kinds({ ranges: [range("192.168.68.0/24")] })).toEqual(["exclusions_required"]);
+    expect(kinds({ ranges: [range("192.168.68.0/24")], nothing_to_exclude: true })).toEqual([]);
+    expect(kinds({ ranges: [range("192.168.68.0/24")], nothing_to_exclude: true, exclusions: ["192.168.68.50"] })).toEqual(["exclusions_contradict"]);
     expect(kinds({ ranges: [range("192.168.68.0/24", [])], exclusions: ["192.168.68.50"] })).toEqual(["bad_range_ports"]);
     expect(kinds({ ranges: [range("192.168.68.0/24", [0])], exclusions: ["192.168.68.50"] })).toEqual(["bad_range_ports"]);
     expect(kinds({ ranges: [range("192.168.68.0/24")], exclusions: ["router"] })).toEqual(["bad_exclusion"]);
@@ -110,6 +112,9 @@ describe("demo validation of capabilities, ranges and scripts (same as Rust appr
     expect(v.scope.max_level).toBe("L2");
     expect(v.scope.ranges).toEqual([{ cidr: "192.168.1.0/24", ports: [80], label: "" }]);
     expect(v.scope.exclusions).toEqual(["192.168.1.50"]);
+    expect(v.scope.nothing_to_exclude).toBe(false);
+    const w = new DemoAssess(() => NOW, () => "s2", (f) => f());
+    expect(w.approve(draft({ ranges: [range("192.168.1.0/24")], nothing_to_exclude: true })).scope.nothing_to_exclude).toBe(true);
   });
 });
 

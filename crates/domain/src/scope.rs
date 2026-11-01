@@ -159,9 +159,14 @@ pub struct Scope {
     /// Private blocks allowed on top of the literal targets (ADR-011).
     #[serde(default)]
     pub ranges: Vec<ScopeRange>,
-    /// Addresses never touched, even inside a range. Required with ranges.
+    /// Addresses never touched, even inside a range. Ranges need these, or
+    /// `nothing_to_exclude`.
     #[serde(default)]
     pub exclusions: Vec<String>,
+    /// The user confirmed that no device in the ranges needs avoiding.
+    /// Recorded instead of a made-up exclusion; only true with ranges.
+    #[serde(default)]
+    pub nothing_to_exclude: bool,
     /// NSE scripts the owner allowed by name (needs `Capability::Nse`).
     #[serde(default)]
     pub nse_scripts: Vec<String>,
@@ -208,6 +213,7 @@ mod tests {
         let s: Scope = serde_json::from_str(old).expect("older scope JSON must still read");
         assert_eq!(s.capabilities, vec![Capability::TcpConnect]);
         assert!(s.ranges.is_empty() && s.exclusions.is_empty() && s.nse_scripts.is_empty());
+        assert!(!s.nothing_to_exclude);
         assert!(s.allows(Capability::TcpConnect) && !s.allows(Capability::SynScan));
     }
 }

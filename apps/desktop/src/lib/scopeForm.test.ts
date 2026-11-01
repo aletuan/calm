@@ -138,3 +138,14 @@ describe("a scope with ranges only (bug: the empty target row was sent)", () => 
   });
 });
 
+describe("nothing to exclude", () => {
+  it("is sent with the draft, and starts unticked", () => {
+    const base = { ...emptyScopeForm("Andy"), authorization_reference: "R", granted_by: "O", ranges: [{ cidr: "192.168.1.0/24", ports: "80", label: "" }] };
+    expect(base.nothing_to_exclude).toBe(false);
+    const r = toDraft({ ...base, nothing_to_exclude: true }, 0);
+    if (!r.ok) throw new Error("draft");
+    expect(r.draft.nothing_to_exclude).toBe(true);
+    expect(r.draft.exclusions).toEqual([]);
+  });
+});
+

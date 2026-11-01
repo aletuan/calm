@@ -51,6 +51,8 @@ export interface Scope {
   capabilities: Capability[];
   ranges: ScopeRange[];
   exclusions: string[];
+  /** The user confirmed no device in the ranges needs avoiding (instead of listing exclusions). */
+  nothing_to_exclude: boolean;
   nse_scripts: string[];
 }
 
@@ -82,6 +84,7 @@ export interface ScopeDraft {
   capabilities?: Capability[];
   ranges?: { cidr: string; ports: number[]; label: string }[];
   exclusions?: string[];
+  nothing_to_exclude?: boolean;
   nse_scripts?: string[];
 }
 
@@ -111,6 +114,7 @@ export type DraftError =
   | { kind: "range_too_large"; index: number }
   | { kind: "bad_range_ports"; index: number }
   | { kind: "exclusions_required" }
+  | { kind: "exclusions_contradict" }
   | { kind: "bad_exclusion"; index: number }
   | { kind: "host_discovery_needs_range" }
   | { kind: "scripts_need_nse" }

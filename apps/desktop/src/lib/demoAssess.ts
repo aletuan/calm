@@ -59,7 +59,8 @@ function validateCapabilities(d: ScopeDraft, e: DraftError[]) {
     if (!ports.length || ports.length > 16 || ports.includes(0)) e.push({ kind: "bad_range_ports", index });
   });
   const exclusions = d.exclusions ?? [];
-  if (ranges.length && !exclusions.length) e.push({ kind: "exclusions_required" });
+  if (d.nothing_to_exclude && exclusions.length) e.push({ kind: "exclusions_contradict" });
+  else if (ranges.length && !exclusions.length && !d.nothing_to_exclude) e.push({ kind: "exclusions_required" });
   exclusions.forEach((x, index) => {
     const t = x.trim();
     if (!v4(t) && !(t.includes(":") && /^[0-9a-fA-F:]+$/.test(t))) e.push({ kind: "bad_exclusion", index });
@@ -225,6 +226,7 @@ export class DemoAssess {
       capabilities: caps,
       ranges: (d.ranges ?? []).map((r) => ({ cidr: `${parseRange(r.cidr)!.net}/${parseRange(r.cidr)!.prefix}`, ports: [...new Set(r.ports)].sort((a, b) => a - b), label: r.label.trim() })),
       exclusions: (d.exclusions ?? []).map((x) => x.trim()),
+      nothing_to_exclude: Boolean(d.nothing_to_exclude) && (d.ranges ?? []).length > 0,
       nse_scripts: d.nse_scripts ?? [],
     };
     this.scopes.set(scope.id, { scope, revoked: false });

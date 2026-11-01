@@ -56,6 +56,9 @@ pub struct ScopeDraft {
     pub ranges: Vec<RangeDraft>,
     #[serde(default)]
     pub exclusions: Vec<String>,
+    /// "No device in these ranges needs avoiding": the alternative to listing exclusions.
+    #[serde(default)]
+    pub nothing_to_exclude: bool,
     #[serde(default)]
     pub nse_scripts: Vec<String>,
 }
@@ -76,6 +79,7 @@ impl Default for ScopeDraft {
             capabilities: default_capabilities(),
             ranges: vec![],
             exclusions: vec![],
+            nothing_to_exclude: false,
             nse_scripts: vec![],
         }
     }
@@ -160,8 +164,10 @@ pub enum DraftError {
     BadRangePorts {
         index: usize,
     },
-    /// Ranges without any excluded address: the owner must name what is off-limits.
+    /// Ranges with neither an excluded address nor "nothing to exclude".
     ExclusionsRequired,
+    /// Addresses listed and "nothing to exclude" ticked: one of them is wrong.
+    ExclusionsContradict,
     BadExclusion {
         index: usize,
     },
@@ -404,6 +410,7 @@ pub fn approve(
         capabilities,
         ranges,
         exclusions,
+        nothing_to_exclude: draft.nothing_to_exclude && !draft.ranges.is_empty(),
         nse_scripts: draft.nse_scripts.clone(),
     })
 }
@@ -480,7 +487,9 @@ fn check_ranges(drafts: &[RangeDraft], errors: &mut Vec<DraftError>) -> Vec<Scop
 }
 
 fn check_exclusions(draft: &ScopeDraft, errors: &mut Vec<DraftError>) -> Vec<String> {
-    if !draft.ranges.is_empty() && draft.exclusions.is_empty() {
+    if draft.nothing_to_exclude && !draft.exclusions.is_empty() {
+        errors.push(DraftError::ExclusionsContradict);
+    } else if !draft.ranges.is_empty() && draft.exclusions.is_empty() && !draft.nothing_to_exclude {
         errors.push(DraftError::ExclusionsRequired);
     }
     let mut out = Vec::new();
@@ -1116,6 +1125,26 @@ mod tests {
             approve_errs(&d),
             vec![DraftError::BadExclusion { index: 0 }]
         );
+    }
+
+    #[test]
+    fn ranges_need_exclusions_or_an_explicit_nothing_to_exclude() {
+        let mut d = draft();
+        d.ranges = vec![range("192.168.68.0/24", vec![80])];
+        d.nothing_to_exclude = true;
+        let s = approve(&d, "x".into(), "s".into(), Some(net()), NOW).unwrap();
+        assert!(s.nothing_to_exclude && s.exclusions.is_empty());
+        // Both at once contradict each other.
+        d.exclusions = vec!["192.168.68.50".into()];
+        assert_eq!(approve_errs(&d), vec![DraftError::ExclusionsContradict]);
+    }
+
+    #[test]
+    fn nothing_to_exclude_means_nothing_without_a_range() {
+        let mut d = draft();
+        d.nothing_to_exclude = true;
+        let s = approve(&d, "x".into(), "s".into(), Some(net()), NOW).unwrap();
+        assert!(!s.nothing_to_exclude, "only recorded for ranges");
     }
 
     #[test]

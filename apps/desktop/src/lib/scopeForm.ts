@@ -31,6 +31,8 @@ export interface ScopeForm {
   ranges: RangeRow[];
   /** Addresses never touched, as typed (one per line, or separated by commas). */
   exclusions: string;
+  /** "No device in these ranges needs avoiding", instead of listing exclusions. */
+  nothing_to_exclude: boolean;
   nse_scripts: string[];
 }
 
@@ -53,6 +55,7 @@ export const emptyScopeForm = (operator = ""): ScopeForm => ({
   capabilities: ["tcp_connect"],
   ranges: [],
   exclusions: "",
+  nothing_to_exclude: false,
   nse_scripts: [],
 });
 
@@ -127,6 +130,7 @@ export function toDraft(
       capabilities: f.capabilities,
       ranges,
       exclusions: exclusionList(f.exclusions),
+      nothing_to_exclude: f.nothing_to_exclude,
       nse_scripts: f.nse_scripts,
     },
   };
@@ -177,6 +181,7 @@ export const DRAFT_ERROR_KINDS: DraftError["kind"][] = [
   "range_too_large",
   "bad_range_ports",
   "exclusions_required",
+  "exclusions_contradict",
   "bad_exclusion",
   "host_discovery_needs_range",
   "scripts_need_nse",

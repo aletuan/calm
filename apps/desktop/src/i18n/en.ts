@@ -694,7 +694,7 @@ export const en = {
   "scope.err.bad_range": "Enter a private IPv4 block by its network address, such as {example}.",
   "scope.err.range_too_large": "Use a block of at most 256 addresses, /24 or smaller.",
   "scope.err.bad_range_ports": "Enter 1 to 16 ports for the range, each from 1 to 65535.",
-  "scope.err.exclusions_required": "Name at least one address the tests must never touch, such as a production till.",
+  "scope.err.exclusions_required": "Name at least one address the tests must never touch, or confirm that no device needs to be avoided.",
   "scope.err.bad_exclusion": "Enter each excluded address as one IP address.",
   "scope.err.host_discovery_needs_range": "Add a range to use host discovery.",
   "scope.err.scripts_need_nse": "Turn on NSE scripts, or remove the scripts listed.",
@@ -726,7 +726,7 @@ export const en = {
   "scope.addRange": "Add range",
   "scope.removeRange": "Remove range",
   "scope.exclusions": "Never touch",
-  "scope.exclusionsHint": "Required with a range. One IP address per line, such as a production till or a guest's device.",
+  "scope.exclusionsHint": "Required with a range: list them, or confirm below that there are none. One IP address per line, such as a production till or a guest's device.",
   "scope.scripts": "Scripts",
   "scope.scriptsHint": "Only scripts that read what a service shows about itself.",
   "nse.http-headers": "Reads the HTTP headers a web server returns.",
@@ -742,6 +742,9 @@ export const en = {
   "scope.suggest.range": "Use this network's range ({cidr})",
   "scope.suggest.narrowed": "This network is wider than 256 addresses, so the suggestion is the /24 around its gateway.",
   "scope.outsideNetwork": "Outside the network this Mac is on. Probes would go through the gateway to another segment.",
+  "scope.nothingToExclude": "No device in these ranges needs to be avoided.",
+  "scope.err.exclusions_contradict": "Remove the listed addresses, or untick the box that says no device needs to be avoided.",
+  "scope.noneToAvoid": "None in these ranges, confirmed",
 } as const;
 
 export type MessageKey = keyof typeof en;
