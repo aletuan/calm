@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Asset, GraphSnapshot, ObservedIdentifier, TopologyEdge } from "./ipc";
-import { edgeId, flowOnly, isCenter, mergeFlowEdges, primaryIdentifier, radialPositions, roleKey, toElements } from "./topologyModel";
+import { edgeId, flowOnly, graphSignature, isCenter, mergeFlowEdges, primaryIdentifier, radialPositions, roleKey, toElements } from "./topologyModel";
 
 const id = (kind: string, value: string): ObservedIdentifier => ({ kind, value, source: "observed_by_mac", seen_at: "" });
 const node = (nid: string, role: string, ids: ObservedIdentifier[], ev: string[], status: Asset["epistemic_status"] = "observed"): Asset => ({
@@ -158,5 +158,12 @@ describe("toElements", () => {
     const el = toElements(g, t as never, false, true).find((e) => e.data.id === "ip:192.0.2.100")!;
     expect(el.data.label).toBe("role.local_peer\n192.0.2.100 +1");
     expect(el.data.flowOnly).toBe(true);
+  });
+  it("signature changes only when nodes or relations change", () => {
+    const same = { nodes: [...g.nodes].reverse(), edges: [...g.edges].reverse() };
+    expect(graphSignature(same)).toBe(graphSignature(g));
+    expect(graphSignature({ ...g, nodes: [...g.nodes, node("ip:192.0.2.64", "local_peer", [id("ipv4", "192.0.2.64")], ["capture:flows"])] })).not.toBe(graphSignature(g));
+    expect(graphSignature({ ...g, edges: g.edges.slice(1) })).not.toBe(graphSignature(g));
+    expect(graphSignature(null)).toBe("");
   });
 });

@@ -199,7 +199,9 @@ function demoOverview(): NetworkOverview {
     confidence: "high",
     evidence_refs: ["capture:flows"],
   });
-  const flowPeers = ["192.0.2.50", "192.0.2.77", "fe80::4a5:8b81:c881:1026", "fe80::8d1:74eb:7fa9:2b6"].map(peer);
+  // The preview capture's late device (see demoCapture) joins the graph after 15 s.
+  const late = demoStart != null && Date.now() - demoStart >= 15_000;
+  const flowPeers = ["192.0.2.50", "192.0.2.77", "fe80::4a5:8b81:c881:1026", "fe80::8d1:74eb:7fa9:2b6", ...(late ? ["192.0.2.64"] : [])].map(peer);
   const fe = (source: string, target: string): TopologyEdge => ({
     source,
     target,
@@ -218,6 +220,7 @@ function demoOverview(): NetworkOverview {
     fe("ip:192.0.2.77", "this-mac"),
     fe("this-mac", "ip:fe80::4a5:8b81:c881:1026"),
     fe("ip:fe80::8d1:74eb:7fa9:2b6", "this-mac"),
+    ...(late ? [fe("this-mac", "ip:192.0.2.64"), fe("ip:192.0.2.64", "this-mac")] : []),
   ];
   return {
     profile,
@@ -388,13 +391,17 @@ function demoCapture(running: boolean): CaptureView {
     first_seen_ms: start,
     last_seen_ms: now - (bin % 7000),
   });
+  // While the preview capture runs, some flows keep growing (so Topology shows
+  // live activity) and a local device turns up after 15 s ("new device").
+  const sec = demoStart ? Math.floor((now - demoStart) / 1000) : 0;
   const flows = [
-    mk("203.0.113.20", 443, "tcp", "outbound", 1_840_000, 96_000),
-    mk("198.51.100.53", 53, "udp", "outbound", 22_400, 9_800),
+    mk("203.0.113.20", 443, "tcp", "outbound", 1_840_000 + sec * 120_000, 96_000 + sec * 6_000),
+    mk("198.51.100.53", 53, "udp", "outbound", 22_400 + Math.floor(sec / 3) * 300, 9_800 + Math.floor(sec / 3) * 120),
     mk("203.0.113.88", 443, "udp", "outbound", 640_000, 41_000),
-    mk("192.0.2.1", 53, "udp", "outbound", 3_100, 1_400),
-    mk("192.0.2.50", 5353, "udp", "heard", 2_900, 0, "local_broadcast"),
+    mk("192.0.2.1", 53, "udp", "outbound", 3_100 + (sec % 4 === 0 ? sec * 90 : 0), 1_400 + sec * 40),
+    mk("192.0.2.50", 5353, "udp", "heard", 2_900 + Math.floor(sec / 5) * 200, 0, "local_broadcast"),
     mk("192.0.2.77", null, "arp", "heard", 420, 0, "local_broadcast"),
+    ...(sec >= 15 ? [mk("192.0.2.64", 7000, "tcp", "outbound", 8_000 + sec * 900, 2_000 + sec * 300)] : []),
   ];
   const total = flows.reduce((a, f) => a + f.bytes_in + f.bytes_out, 0);
   return {

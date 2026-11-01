@@ -29,6 +29,7 @@ describe("i18n", () => {
       ...POSITIONS.flatMap((p) => [`position.${p}`, `position.from.${p}`]),
       ...["session", "scope", "run", "findings"].flatMap((x) => [`journey.${x}`, `journey.${x}.hint`]),
       ...["done", "current", "todo"].map((x) => `journey.state.${x}`),
+      ...["ASSOCIATED_WITH", "DEFAULT_ROUTE_VIA", "RESOLVES_VIA", "FLOW_OBSERVED", "other"].map((x) => `relation.${x}`),
       ...["not_an_address", "unspecified", "loopback", "multicast", "broadcast", "link_local", "not_private"].map((r) => `scope.err.address.${r}`),
       ...["hours", "rate", "timeout_s"].map((f) => `scope.err.number.${f}`),
       ...["active_exists", "no_active_session", "store", "invalid"].map((k) => `scope.err.${k}`),
@@ -60,5 +61,54 @@ describe("i18n", () => {
     expect(vi["check.S01.limits"]).toMatch(/Không cho thấy ai đăng nhập được/);
     // Where the Mac stood is filled in, never assumed to be Guest Wi-Fi.
     for (const d of [en, vi]) for (const k of ["check.S01.title", "check.N01.title", "check.S01.short", "check.N03.short", "check.N01.short", "finding.claim.tcp_accepted"] as const) expect(d[k], k).toContain("{from}");
+  });
+  // Voice and terminology rules (docs/design/02-voice-and-terminology.md).
+  describe("voice rules", () => {
+    const entries = (d: Record<string, string>) => Object.entries(d);
+    /** The user's own attestations are the only first-person strings. */
+    const ATTESTATIONS = new Set(["scope.confirm", "assess.receiverConfirm"]);
+
+    it("Vietnamese addresses the user as \"bạn\", never anh/chị, and avoids blaming words", () => {
+      const wordAt = (w: string) => new RegExp(`(^|[\\s("“])${w}(?=[\\s,.;:)"”]|$)`, "i");
+      for (const [k, v] of entries(vi)) {
+        expect(wordAt("anh").test(v), k).toBe(false);
+        expect(wordAt("chị").test(v), k).toBe(false);
+        expect(/vui lòng|không hợp lệ|thất bại/i.test(v), k).toBe(false);
+        if (!ATTESTATIONS.has(k)) expect(wordAt("tôi").test(v), k).toBe(false);
+      }
+    });
+
+    it("English avoids blame, filler and internal build words; first person only in attestations", () => {
+      for (const [k, v] of entries(en)) {
+        expect(/\b(invalid|failed|please|simply|obviously|skeleton|alpha|stub|fatal)\b/i.test(v), k).toBe(false);
+        if (!ATTESTATIONS.has(k)) expect(/\b(I|my|My)\b/.test(v), k).toBe(false);
+      }
+    });
+
+    it("buttons are short and in sentence case", () => {
+      const BUTTONS = ["session.create", "session.use", "session.delete", "session.confirmDelete", "session.new", "session.saveLive", "session.saveImport", "session.view", "session.open", "session.cancel", "scope.approve", "scope.revoke", "scope.revokeConfirm", "scope.addTarget", "scope.removeTarget", "assess.run", "assess.stop", "assess.openFindings", "assess.goScope", "inspector.traffic.open", "inspector.close", "import.pick", "topology.reset"] as const;
+      const PROPER = /^(Mac|Calm|PCAP|PCAPNG|Wi-Fi|DNS|IP|TCP|Findings|Traffic|Topology|Sessions|Assessment|S0\d|N0\d|\/)…?$/;
+      for (const k of BUTTONS) {
+        for (const d of [en, vi]) {
+          const words = d[k].split(/\s+/);
+          expect(words.length, `${k}: ${d[k]}`).toBeLessThanOrEqual(4);
+          expect(d[k].endsWith("."), k).toBe(false);
+          for (const w of words.slice(1)) if (/^[A-ZÀ-Ỹ]/.test(w)) expect(PROPER.test(w), `${k}: "${w}" in "${d[k]}"`).toBe(true);
+        }
+      }
+    });
+
+    it("kept-English terms stay English in Vietnamese, and evidence words stay Vietnamese", () => {
+      for (const [k, v] of entries(vi)) {
+        // Session is kept in English; "phiên bản" (version) is a different word.
+        expect(/phiên(?! bản)/i.test(v), k).toBe(false);
+        // Epistemic statuses are translated everywhere, legends included.
+        expect(/\b(Observed|Inferred|Unverified)\b/.test(v), k).toBe(false);
+      }
+    });
+
+    it("the stop control has one name everywhere", () => {
+      for (const d of [en, vi]) for (const [k, v] of entries(d)) expect(/Emergency Stop/.test(v), k).toBe(false);
+    });
   });
 });

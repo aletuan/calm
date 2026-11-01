@@ -1,6 +1,7 @@
 import type { ElementDefinition } from "cytoscape";
 import type { MessageKey } from "../i18n/en";
 import type { Asset, GraphSnapshot, TopologyEdge } from "./ipc";
+import { relationKey } from "./topologyIcons";
 
 /**
  * Pure topology model: what the Cytoscape view shows, decided without the DOM
@@ -80,7 +81,8 @@ export function radialPositions(
   const mac = g.nodes.find(isCenter);
   if (mac) pos[mac.id] = { x: 0, y: 0 };
   const total = Math.max(shown.length, 1);
-  const ry = 150 + total * 14;
+  // Nodes carry an icon above their label and every edge has a label: leave room for both.
+  const ry = 190 + total * 16;
   const rx = ry * 1.7;
   const place = (nodes: Asset[], from: number, to: number) => {
     nodes.forEach((n, i) => {
@@ -138,9 +140,18 @@ export function toElements(
         target: e.target,
         status: e.epistemic_status,
         relation: e.relation_type,
+        relationLabel: t(relationKey(e.relation_type)),
         bidir,
       },
     })),
   ];
 }
 
+
+/** Same nodes and relations (by id and status)? Used to skip redrawing an unchanged live graph. */
+export function graphSignature(g: GraphSnapshot | null): string {
+  if (!g) return "";
+  const nodes = g.nodes.map((n) => `${n.id}:${n.epistemic_status}`).sort();
+  const edges = g.edges.map((e) => `${edgeId(e)}:${e.epistemic_status}`).sort();
+  return `${nodes.join(",")}#${edges.join(",")}`;
+}

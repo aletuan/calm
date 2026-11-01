@@ -1,5 +1,8 @@
 import cytoscape, { type Core, type StylesheetJson } from "cytoscape";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { iconDataUri, roleIcon } from "../lib/topologyIcons";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { edgeMotions, newNodes } from "../lib/activity";
+import { TopologyActivity } from "./TopologyActivity";
 import { useCapture } from "../app/capture";
 import { useImport } from "../app/imported";
 import { useProfile } from "../app/profile";
@@ -7,7 +10,7 @@ import { useSelection } from "../app/selection";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n/en";
 import type { Asset, TopologyEdge } from "../lib/ipc";
-import { edgeId, flowOnly, isCenter, primaryIdentifier, radialPositions, roleKey, toElements } from "../lib/topologyModel";
+import { edgeId, flowOnly, graphSignature, isCenter, primaryIdentifier, radialPositions, roleKey, toElements } from "../lib/topologyModel";
 import { endpoint, fmtBytes, fmtLocalTime, fmtNum, transportName } from "../lib/format";
 import { flowsFor, graphView, type FlowSelection, type GraphSnapshot, type GraphView, type SourceRef, type TimeWindow } from "../lib/ipc";
 import { filterForNode, nodeForAddress, trafficFilterFor } from "../lib/nodeFlows";
@@ -34,7 +37,6 @@ function stylesheet(): StylesheetJson {
   const surface = cssVar("--color-bg-surface");
   const accent = cssVar("--color-accent-primary");
   const font = cssVar("--font-sans");
-  const mono = cssVar("--font-mono");
   return [
     {
       selector: "node",
@@ -49,19 +51,33 @@ function stylesheet(): StylesheetJson {
         "font-family": font,
         "font-size": 13,
         "text-wrap": "wrap",
+        "line-height": 1.25,
+        // Icon on top, the role and its identifier underneath.
         "text-valign": "center",
         "text-halign": "center",
+        "text-margin-y": 13,
+        "background-image": (n: cytoscape.NodeSingular) => iconDataUri(roleIcon(n.data("role")), fg),
+        "background-width": "24px",
+        "background-height": "24px",
+        "background-position-x": "50%",
+        "background-position-y": "11px",
+        "background-clip": "none",
         // Explicit size: `width: "label"` is deprecated in Cytoscape 3.3x.
         width: (n: cytoscape.NodeSingular) =>
-          Math.max(96, ...String(n.data("label") ?? "").split("\n").map((l) => l.length * 7.6)) + 24,
-        height: 46,
+          Math.max(104, ...String(n.data("label") ?? "").split("\n").map((l) => l.length * 7.6)) + 28,
+        height: 82,
       },
     },
     { selector: 'node[role = "this_mac"], node[role = "capture_host"]', style: { "border-style": "double", "border-width": 3 } },
     { selector: 'node[status = "inferred"]', style: { "border-style": "dashed" } },
     {
       selector: 'node[status = "unverified"]',
-      style: { "border-style": "dotted", "background-color": surface, color: muted },
+      style: {
+        "border-style": "dotted",
+        "background-color": surface,
+        color: muted,
+        "background-image": (n: cytoscape.NodeSingular) => iconDataUri(roleIcon(n.data("role")), muted),
+      },
     },
     {
       selector: "edge",
@@ -72,13 +88,22 @@ function stylesheet(): StylesheetJson {
         "curve-style": "bezier",
         "target-arrow-shape": "triangle",
         "target-arrow-color": muted,
-        "arrow-scale": 0.7,
-        "font-family": mono,
-        "font-size": 10,
-        color: muted,
+        "arrow-scale": 0.8,
+        // Parallel relations between the same two nodes (route and traffic) fan out.
+        "control-point-step-size": 44,
+        // Every edge says what it is, in plain words, on a pill that hides the line under it.
+        label: "data(relationLabel)",
+        "font-family": font,
+        "font-size": 11,
+        color: fg,
+        "text-rotation": "none",
         "text-background-color": surface,
         "text-background-opacity": 1,
-        "text-background-padding": "2px",
+        "text-background-shape": "roundrectangle",
+        "text-background-padding": "3px",
+        "text-border-color": muted,
+        "text-border-width": 1,
+        "text-border-opacity": 0.35,
       },
     },
     { selector: 'edge[relation = "FLOW_OBSERVED"]', style: { width: 1.2, "line-opacity": 0.55 } },
@@ -88,7 +113,9 @@ function stylesheet(): StylesheetJson {
     },
     { selector: 'edge[status = "inferred"]', style: { "line-style": "dashed" } },
     { selector: 'edge[status = "unverified"]', style: { "line-style": "dotted" } },
-    { selector: "edge.show-label, edge:selected", style: { label: "data(relation)" } },
+    // Live activity: an edge that carried bytes in the last seconds, a device that just appeared.
+    { selector: "edge.active", style: { "line-color": accent, "target-arrow-color": accent, "source-arrow-color": accent, "line-opacity": 1, width: 2 } },
+    { selector: "node.is-new", style: { "border-color": accent, "border-width": 2, "border-opacity": 1 } },
     { selector: "node:selected", style: { "border-color": accent, "border-width": 2, "border-opacity": 1 } },
     { selector: 'node[role = "this_mac"]:selected', style: { "border-width": 4 } },
     {
@@ -273,6 +300,38 @@ function Inspector({ subject, onClose, graph, source, window }: { subject: Subje
 const MAX_FIT_ZOOM = 1;
 
 /** Fit the graph, but never zoom a small graph in beyond MAX_FIT_ZOOM. */
+const ACTIVITY_KEY = "calm.topology.activity";
+
+/** "Live activity" is on unless the viewer turned it off. */
+function readActivityPref(): boolean {
+  try {
+    return window.localStorage.getItem(ACTIVITY_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+function saveActivityPref(on: boolean) {
+  try {
+    window.localStorage.setItem(ACTIVITY_KEY, on ? "on" : "off");
+  } catch {
+    /* per-viewer convenience only */
+  }
+}
+
+/** macOS "Reduce motion": nothing moves, state is still shown. */
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(() => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
+  useEffect(() => {
+    const m = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!m) return;
+    const on = () => setReduced(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return reduced;
+}
+
 function fitCapped(cy: Core, padding = 48) {
   cy.fit(undefined, padding);
   if (cy.zoom() > MAX_FIT_ZOOM) {
@@ -330,8 +389,13 @@ export function TopologyScreen() {
   const [observedOnly, setObservedOnly] = useState(false);
   // Overlays are off by default (design §5).
   const [trafficToggle, setShowTraffic] = useState(false);
-  const { running: capturing } = useCapture();
+  const { running: capturing, view: captureView, activity, firstSeen, seenByUser, markSeen, pulsed, markPulsed } = useCapture();
   const imp = useImport();
+  const [activityOn, setActivityOn] = useState(readActivityPref);
+  const reduced = useReducedMotion();
+  const [cyInst, setCyInst] = useState<Core | null>(null);
+  // While capturing, the live graph is re-read every 5 s; redrawn only when it changed.
+  const [polledGraph, setPolledGraph] = useState<GraphSnapshot | null>(null);
   // Imported files and saved snapshots are shown on their own, never merged
   // with this Mac's live graph.
   const r = resolveSource(imp.source, liveGraph, imp.view, imp.saved);
@@ -340,7 +404,8 @@ export function TopologyScreen() {
   const imported = r.perspective === "host";
   const win = selection.timeWindow;
   // With a time window the backend rebuilds the graph from flows in that window.
-  const graph = win && windowView ? windowView.graph : r.graph;
+  const live = r.isLive && capturing;
+  const graph = win && windowView ? windowView.graph : live && polledGraph ? polledGraph : r.graph;
   const showTraffic = !r.isLive || trafficToggle || win != null;
 
   // A different source has a different time span: start from everything again.
@@ -371,6 +436,61 @@ export function TopologyScreen() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceKey, JSON.stringify(win), timeOpen, capturing]);
+
+  useEffect(() => {
+    if (!live || win) {
+      setPolledGraph(null);
+      return;
+    }
+    let alive = true;
+    const load = () =>
+      graphView(sourceRef, null)
+        .then((v) => alive && setPolledGraph((cur) => (graphSignature(cur) === graphSignature(v.graph) ? cur : v.graph)))
+        .catch(() => undefined);
+    void load();
+    const id = window.setInterval(() => void load(), 5000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, sourceKey, JSON.stringify(win)]);
+
+  // Live activity, recomputed on every capture poll (once a second).
+  const now = useMemo(() => Date.now(), [activity, captureView]); // eslint-disable-line react-hooks/exhaustive-deps
+  const motions = useMemo(
+    () => (graph && live && activityOn && showTraffic ? edgeMotions(graph, activity, now) : []),
+    [graph, live, activityOn, showTraffic, activity, now],
+  );
+  const newIds = useMemo(
+    () => (graph && live && captureView ? newNodes(graph, firstSeen, captureView.started_at_ms, seenByUser, now) : []),
+    [graph, live, captureView, firstSeen, seenByUser, now],
+  );
+  const pulseIds = useMemo(() => (activityOn ? newIds.filter((id) => !pulsed.has(id)) : []), [activityOn, newIds, pulsed]);
+  const centerId = graph?.nodes.find(isCenter)?.id ?? null;
+  const accentColor = useMemo(() => cssVar("--color-accent-primary"), []);
+  const onPulsed = useCallback((ids: string[]) => markPulsed(ids), [markPulsed]);
+
+  // Tint the edges that move and frame the new devices (also under reduced motion).
+  useEffect(() => {
+    if (!cyInst || !centerId) return;
+    cyInst.batch(() => {
+      cyInst.edges().removeClass("active");
+      cyInst.nodes().removeClass("is-new");
+      for (const m of motions) {
+        cyInst
+          .edges('[relation = "FLOW_OBSERVED"]')
+          .filter((e) => (e.source().id() === centerId && e.target().id() === m.nodeId) || (e.source().id() === m.nodeId && e.target().id() === centerId))
+          .addClass("active");
+      }
+      for (const id of newIds) cyInst.getElementById(id).addClass("is-new");
+    });
+  }, [cyInst, centerId, motions, newIds]);
+
+  // Looking at a new device clears its marker.
+  useEffect(() => {
+    if (selection.subjectId && newIds.includes(selection.subjectId)) markSeen(selection.subjectId);
+  }, [selection.subjectId, newIds, markSeen]);
 
   // "Show in Topology" from Traffic: select the node that owns the address.
   useEffect(() => {
@@ -420,15 +540,15 @@ export function TopologyScreen() {
     cy.on("tap", (evt) => {
       if (evt.target === cy) setSelection({ ...selection, subjectId: null });
     });
-    cy.on("mouseover", "edge", (evt) => evt.target.addClass("show-label"));
-    cy.on("mouseout", "edge", (evt) => evt.target.removeClass("show-label"));
     if (selection.subjectId) cy.getElementById(selection.subjectId).select();
     // A small graph (e.g. a narrow time window) should not be blown up to fill the canvas.
     fitCapped(cy, 40);
     cyRef.current = cy;
+    setCyInst(cy);
     return () => {
       cy.destroy();
       cyRef.current = null;
+      setCyInst(null);
     };
     // selection is applied once per rebuild; tap handlers write it back.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -483,6 +603,14 @@ export function TopologyScreen() {
                   ? "topology.summary.scopeTraffic"
                   : "topology.summary.scope",
             )}
+            {newIds.length > 0 && (
+              <>
+                {" · "}
+                <button className="link-button" onClick={() => setSelection({ ...selection, subjectId: newIds[0]! })}>
+                  <span className="mono">{newIds.length}</span> {t(newIds.length === 1 ? "topology.newDevice" : "topology.newDevices")}
+                </button>
+              </>
+            )}
           </p>
         </div>
         {r.isLive && (
@@ -520,6 +648,20 @@ export function TopologyScreen() {
             {t("topology.tool.traffic")}
           </button>
         )}
+        {r.isLive && (
+          <button
+            className="chip"
+            aria-pressed={activityOn}
+            title={t("topology.tool.activityHint")}
+            onClick={() => {
+              const v = !activityOn;
+              setActivityOn(v);
+              saveActivityPref(v);
+            }}
+          >
+            {t("topology.tool.activity")}
+          </button>
+        )}
         <button className="chip" aria-pressed={timeOpen || win != null} onClick={() => setTimeOpen((v) => !v)}>
           {t("topology.tool.time")}
           {win ? `: ${fmtLocalTime(win.from_ms)}–${fmtLocalTime(win.to_ms - 1)}` : ""}
@@ -528,6 +670,7 @@ export function TopologyScreen() {
           {t("topology.tool.findings")}
         </button>
       </div>
+      {live && activityOn && !showTraffic && <p className="meta small activity-hint">{t("topology.activityNeedsTraffic")}</p>}
       {timeOpen &&
         (windowView?.span ? (
           <TimePanel
@@ -542,8 +685,20 @@ export function TopologyScreen() {
         ))}
 
       <div className={`topo-body ${subject ? "with-inspector" : ""}`}>
-        <div className="topo-canvas" ref={host} aria-label={t("nav.topology")} role="img">
-          {!graph && <div className="empty">{t("topology.loading")}</div>}
+        <div className="topo-stage">
+          <div className="topo-canvas" ref={host} aria-label={t("nav.topology")} role="img">
+            {!graph && <div className="empty">{t("topology.loading")}</div>}
+          </div>
+          <TopologyActivity
+            cy={cyInst}
+            centerId={centerId}
+            motions={motions}
+            newIds={newIds}
+            pulseIds={pulseIds}
+            onPulsed={onPulsed}
+            reduced={reduced}
+            color={accentColor}
+          />
         </div>
         {subject && (
           <Inspector

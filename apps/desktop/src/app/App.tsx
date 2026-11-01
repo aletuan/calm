@@ -10,7 +10,7 @@ import { useSession } from "./session";
 import { useProfile } from "./profile";
 import { useAssessMode } from "./assessMode";
 import { Screen } from "../screens/Screen";
-import calmIcon from "../../src-tauri/icons/128x128.png";
+import calmIcon from "../assets/calm-mark.png";
 
 export function App() {
   const { source: importSource } = useImport();

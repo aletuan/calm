@@ -81,6 +81,7 @@ Also:
   - `en.ts` is the source and `vi.ts` must have every key (a test enforces it).
   - Keys built at runtime are listed in `i18n.test.ts`.
   - Text that depends on where the Mac stands uses the `{from}` placeholder with `fromText()`; never hard-code "Guest Wi-Fi".
+  - Wording follows `docs/design/02-voice-and-terminology.md`: one calm voice, "you"/"bạn", sentence case, the patterns per kind of text, and the EN/VI term list. The "voice rules" tests in `i18n.test.ts` enforce the mechanical part.
 - **Design tokens only.** Do not use raw colors or pixel spacing in components. Use the spacing roles in `tokens.css`:
   - `--gap-tight` 4px · `--gap-related` 8px · `--gap-field` 12px · `--gap-block` 16px · `--gap-section` 32px;
   - `--control-height` for inputs, selects and primary buttons; `--control-height-sm` for chips.
